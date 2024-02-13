@@ -34,7 +34,8 @@ jobs:
 
       - run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
       - run: xcaddy build v${{ env.CADDY_VERSION }} --with github.com/caddy-dns/route53
-      - run: |
+      - shell: bash
+        run: |
           ext=""
           [[ "${{ runner.os }}" == windows* ]] && ext=".exe"
           mv caddy$ext caddy-${{ runner.os }}-${{ runner.arch }}$ext

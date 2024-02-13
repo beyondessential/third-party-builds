@@ -78,5 +78,9 @@ jobs:
 
       - name: Upload
         run: |
-          aws s3 cp caddy-* s3://bes-ops-tools/caddy/${{ env.CADDY_VERSION }}/ --no-progress
-          aws s3 cp caddy-* s3://bes-ops-tools/caddy/latest/ --no-progress
+          for f in caddy-*; do
+            aws s3 cp $f s3://bes-ops-tools/caddy/${{ env.CADDY_VERSION }}/$f --no-progress
+            aws s3 cp $f s3://bes-ops-tools/caddy/${{ env.CADDY_VERSION }}/$f.sig --no-progress
+            aws s3 cp $f s3://bes-ops-tools/caddy/latest/$f --no-progress
+            aws s3 cp $f s3://bes-ops-tools/caddy/latest/$f.sig --no-progress
+          done

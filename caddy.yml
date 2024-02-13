@@ -1,0 +1,77 @@
+name: Build and upload our custom caddy to S3
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/caddy.yml
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  CADDY_VERSION: 2.7.6
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+          - macos-14
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/setup-go@v5
+      - run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
+      - run: xcaddy build ${{ env.CADDY_VERSION }} --with github.com/caddy-dns/route53
+      - run: |
+          ext=""
+          [[ "${{ runner.os }}" == windows* ]] && ext=".exe"
+          mv caddy$ext caddy-${{ runner.os }}-${{ runner.arch }}$ext
+      - uses: actions/upload-artifact@v4
+        with:
+          name: caddy-${{ matrix.os }}
+          path: |
+            caddy*
+            caddy*.exe
+          if-no-files-found: error
+
+  upload:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token for AWS login
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: caddy-*
+          merge-multiple: true
+
+      - name: Sign binaries
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: |
+          curl -Lo bestool https://tools.ops.tamanu.io/bestool/gha/${{ runner.os }}-${{ runner.arch }}
+          chmod +x bestool
+          ./bestool crypto sign --key-env SIGNING_KEY  \
+            --comment 'ts={timestamp} repo=${{ github.repository }} commit=${{ github.sha }} gharun=${{ github.run_id }}' \
+            caddy-*
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: ap-southeast-2
+          role-to-assume: arn:aws:iam::143295493206:role/gha-ops-scripts-s3
+          role-session-name: GHA@Ops=Caddy
+
+      - name: Upload
+        run: |
+          aws s3 cp caddy-* s3://bes-ops-tools/caddy/${{ env.CADDY_VERSION }}/ --no-progress
+          aws s3 cp caddy-* s3://bes-ops-tools/caddy/latest/ --no-progress

@@ -16,7 +16,7 @@ jobs:
   build-honeyvent:
     runs-on: windows-latest
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
       - run: go install github.com/honeycombio/honeyvent@latest
       - run: mv $(go env GOPATH)/bin/honeyvent.exe .
         shell: bash

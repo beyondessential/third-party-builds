@@ -60,7 +60,7 @@ jobs:
           mv caddy$ext caddy-${{ matrix.name }}$ext
       - uses: actions/upload-artifact@v4
         with:
-          name: caddy-${{ matrix.os }}
+          name: caddy-${{ matrix.name }}
           path: |
             caddy*
             caddy*.exe

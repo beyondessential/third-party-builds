@@ -20,11 +20,27 @@ jobs:
   build:
     strategy:
       matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
-          - macos-latest
-          - macos-14
+        include:
+          - os: ubuntu-latest
+            name: x86_64-unknown-linux-gnu
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-latest
+            name: aarch64-unknown-linux-gnu
+            goos: linux
+            goarch: arm64
+          - os: windows-latest
+            name: x86_64-pc-windows-gnu
+            goos: windows
+            goarch: amd64
+          - os: macos-14
+            name: x86_64-apple-darwin
+            goos: darwin
+            goarch: amd64
+          - os: macos-14
+            name: aarch64-apple-darwin
+            goos: darwin
+            goarch: arm64
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -34,11 +50,14 @@ jobs:
 
       - run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
       - run: xcaddy build v${{ env.CADDY_VERSION }} --with github.com/caddy-dns/route53
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
       - shell: bash
         run: |
           ext=""
           [[ "${{ runner.os }}" == windows* ]] && ext=".exe"
-          mv caddy$ext caddy-${{ runner.os }}-${{ runner.arch }}$ext
+          mv caddy$ext caddy-${{ matrix.name }}$ext
       - uses: actions/upload-artifact@v4
         with:
           name: caddy-${{ matrix.os }}

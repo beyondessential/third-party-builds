@@ -1,0 +1,118 @@
+name: Build and upload WAL-G to S3
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/wal-g.yml
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: 1.22
+  WALG_VERSION: 3.0.0
+  USE_LIBSODIUM: 1
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: x86_64-unknown-linux-gnu
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-latest
+            name: aarch64-unknown-linux-gnu
+            goos: linux
+            goarch: arm64
+          - os: windows-latest
+            name: x86_64-pc-windows-gnu
+            goos: windows
+            goarch: amd64
+          - os: macos-14
+            name: x86_64-apple-darwin
+            goos: darwin
+            goarch: amd64
+          - os: macos-14
+            name: aarch64-apple-darwin
+            goos: darwin
+            goarch: arm64
+
+    runs-on: ${{ matrix.os }}
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+    steps:
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install wal-g dependencies
+        if: runner.os == 'Ubuntu'
+        run: sudo apt install libsodium-dev curl cmake
+      - name: Install wal-g dependencies
+        if: runner.os == 'macOS'
+        run: brew install cmake
+
+      - name: Checkout wal-g source
+        uses: actions/checkout@v4
+        with:
+          repository: wal-g/wal-g
+          ref: v${{ env.WALG_VERSION }}
+
+      - run: make deps
+      - run: make pg_build
+
+      - shell: bash
+        run: |
+          ext=""
+          [[ "${{ runner.os }}" == windows* ]] && ext=".exe"
+          mv main/pg/wal-g$ext wal-g-${{ matrix.name }}$ext
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wal-g-${{ matrix.name }}
+          path: |
+            wal-g-${{ matrix.name }}
+            wal-g-${{ matrix.name }}.exe
+          if-no-files-found: error
+
+  upload:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token for AWS login
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wal-g-*
+          merge-multiple: true
+
+      - name: Sign binaries
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: |
+          curl -Lo bestool https://tools.ops.tamanu.io/bestool/gha/${{ runner.os }}-${{ runner.arch }}
+          chmod +x bestool
+          ./bestool crypto sign --key-env SIGNING_KEY  \
+            --comment 'ts={timestamp} repo=${{ github.repository }} commit=${{ github.sha }} gharun=${{ github.run_id }}' \
+            wal-g-*
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: ap-southeast-2
+          role-to-assume: arn:aws:iam::143295493206:role/gha-ops-scripts-s3
+          role-session-name: GHA@Ops=WalG
+
+      - name: Upload
+        run: |
+          for f in wal-g-*; do
+            aws s3 cp $f s3://bes-ops-tools/wal-g/${{ env.WALG_VERSION }}/$f --no-progress
+            aws s3 cp $f s3://bes-ops-tools/wal-g/latest/$f --no-progress
+          done

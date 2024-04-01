@@ -26,7 +26,7 @@ jobs:
             name: x86_64-unknown-linux-gnu
             goos: linux
             goarch: amd64
-          - os: ubuntu-latest
+          - os: Linux-ARM64
             name: aarch64-unknown-linux-gnu
             goos: linux
             goarch: arm64
@@ -61,7 +61,7 @@ jobs:
 
       - name: Install wal-g dependencies
         if: runner.os == 'Ubuntu'
-        run: sudo apt install libsodium-dev curl cmake
+        run: sudo apt install libsodium-dev curl cmake build-essential
       - name: Install wal-g dependencies
         if: runner.os == 'macOS'
         run: |

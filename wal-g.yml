@@ -15,7 +15,6 @@ concurrency:
 env:
   GO_VERSION: 1.22
   WALG_VERSION: 3.0.0
-  USE_LIBSODIUM: 1
 
 jobs:
   build:
@@ -48,23 +47,26 @@ jobs:
     env:
       GOOS: ${{ matrix.goos }}
       GOARCH: ${{ matrix.goarch }}
+      USE_LIBSODIUM: "true"
     steps:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-
-      - name: Install wal-g dependencies
-        if: runner.os == 'Ubuntu'
-        run: sudo apt install libsodium-dev curl cmake
-      - name: Install wal-g dependencies
-        if: runner.os == 'macOS'
-        run: brew install cmake
 
       - name: Checkout wal-g source
         uses: actions/checkout@v4
         with:
           repository: wal-g/wal-g
           ref: v${{ env.WALG_VERSION }}
+
+      - name: Install wal-g dependencies
+        if: runner.os == 'Ubuntu'
+        run: sudo apt install libsodium-dev curl cmake
+      - name: Install wal-g dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake
+          ./link_libsodium.sh
 
       - run: make deps
       - run: make pg_build

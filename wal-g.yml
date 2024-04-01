@@ -59,10 +59,10 @@ jobs:
           ref: v${{ env.WALG_VERSION }}
 
       - name: Install wal-g dependencies
-        if: runner.os == 'Ubuntu'
+        if: contains(matrix.name, 'linux')
         run: sudo apt install curl cmake build-essential
       - name: Install wal-g dependencies
-        if: runner.os == 'macOS'
+        if: contains(matrix.name, 'darwin')
         run: brew install cmake
 
       - run: make deps

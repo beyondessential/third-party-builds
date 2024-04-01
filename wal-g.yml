@@ -47,7 +47,6 @@ jobs:
     env:
       GOOS: ${{ matrix.goos }}
       GOARCH: ${{ matrix.goarch }}
-      USE_LIBSODIUM: "true"
     steps:
       - uses: actions/setup-go@v5
         with:
@@ -61,12 +60,10 @@ jobs:
 
       - name: Install wal-g dependencies
         if: runner.os == 'Ubuntu'
-        run: sudo apt install libsodium-dev curl cmake build-essential
+        run: sudo apt install curl cmake build-essential
       - name: Install wal-g dependencies
         if: runner.os == 'macOS'
-        run: |
-          brew install cmake
-          ./link_libsodium.sh
+        run: brew install cmake
 
       - run: make deps
       - run: make pg_build

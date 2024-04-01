@@ -93,16 +93,6 @@ jobs:
           pattern: wal-g-*
           merge-multiple: true
 
-      - name: Sign binaries
-        env:
-          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
-        run: |
-          curl -Lo bestool https://tools.ops.tamanu.io/bestool/gha/${{ runner.os }}-${{ runner.arch }}
-          chmod +x bestool
-          ./bestool crypto sign --key-env SIGNING_KEY  \
-            --comment 'ts={timestamp} repo=${{ github.repository }} commit=${{ github.sha }} gharun=${{ github.run_id }}' \
-            wal-g-*
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:

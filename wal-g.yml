@@ -63,7 +63,7 @@ jobs:
 
       - name: Install wal-g dependencies
         if: contains(matrix.name, 'linux')
-        run: sudo apt install curl cmake build-essential
+        run: sudo apt install -y curl cmake build-essential
       - name: Install wal-g dependencies
         if: contains(matrix.name, 'darwin')
         run: brew install cmake

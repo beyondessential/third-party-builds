@@ -74,7 +74,7 @@ jobs:
       - shell: bash
         run: |
           ext=""
-          [[ "${{ runner.os }}" == windows* ]] && ext=".exe"
+          [[ "${{ matrix.goos }}" == "windows" ]] && ext=".exe"
           mv main/pg/wal-g$ext wal-g-${{ matrix.name }}$ext
       - uses: actions/upload-artifact@v4
         with:

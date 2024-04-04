@@ -109,3 +109,6 @@ jobs:
             aws s3 cp $f s3://bes-ops-tools/wal-g/${{ env.WALG_VERSION }}/$f --no-progress
             aws s3 cp $f s3://bes-ops-tools/wal-g/latest/$f --no-progress
           done
+
+      - name: Clear cache
+        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths /wal-g

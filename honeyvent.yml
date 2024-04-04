@@ -73,3 +73,6 @@ jobs:
         run: |
           aws s3 cp honeyvent.exe s3://bes-ops-tools/honeyvent.exe --no-progress
           aws s3 cp honeyvent.exe.sig s3://bes-ops-tools/honeyvent.exe.sig --no-progress
+
+      - name: Clear cache
+        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths /honeyvent.exe --paths /honeyvent.exe.sig

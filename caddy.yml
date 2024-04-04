@@ -101,3 +101,6 @@ jobs:
             aws s3 cp $f s3://bes-ops-tools/caddy/${{ env.CADDY_VERSION }}/$f --no-progress
             aws s3 cp $f s3://bes-ops-tools/caddy/latest/$f --no-progress
           done
+
+      - name: Clear cache
+        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths /caddy

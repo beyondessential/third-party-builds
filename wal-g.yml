@@ -111,4 +111,4 @@ jobs:
           done
 
       - name: Clear cache
-        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths /wal-g
+        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths '/wal-g/*'

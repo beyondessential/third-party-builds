@@ -55,11 +55,9 @@ jobs:
       - name: Checkout wal-g source
         uses: actions/checkout@v4
         with:
-          # repository: wal-g/wal-g
+          repository: wal-g/wal-g
+          # use master until new release >3.0.0
           # ref: v${{ env.WALG_VERSION }}
-          # temporarily use fork that's fixed for Windows
-          repository: passcod/wal-g
-          ref: windows-flock
 
       - name: Install wal-g dependencies
         if: contains(matrix.name, 'linux')

@@ -1,0 +1,114 @@
+name: Build and upload podman to S3
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/podman.yml
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: 1.22
+  PODMAN_VERSION: 5.1.1
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: x86_64-unknown-linux-gnu
+            goos: linux
+            goarch: amd64
+          - os: Linux-ARM64
+            name: aarch64-unknown-linux-gnu
+            goos: linux
+            goarch: arm64
+
+    runs-on: ${{ matrix.os }}
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+    steps:
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Checkout podman source
+        uses: actions/checkout@v4
+        with:
+          repository: containers/podman
+          ref: v${{ env.PODMAN_VERSION }}
+
+      - name: Install podman dependencies
+        run: |
+          sudo apt install -y \
+            btrfs-progs \
+            conmon \
+            crun \
+            git \
+            golang-go \
+            go-md2man \
+            iptables \
+            libapparmor-dev \
+            libassuan-dev \
+            libbtrfs-dev \
+            libc6-dev \
+            libdevmapper-dev \
+            libglib2.0-dev \
+            libgpgme-dev \
+            libgpg-error-dev \
+            libprotobuf-dev \
+            libprotobuf-c-dev \
+            libseccomp-dev \
+            libselinux1-dev \
+            libsystemd-dev \
+            netavark \
+            pkg-config \
+            uidmap
+          sudo sysctl kernel.unprivileged_userns_clone=1
+
+      - run: make BUILDTAGS="apparmor cni seccomp systemd exclude_graphdriver_devicemapper" PREFIX=/usr
+      - run: mkdir podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
+      - run: make DESTDIR=$(pwd)/podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }} install
+      - run: tar -caf podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}.tar.zst podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
+          path: podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}.tar.zst
+          if-no-files-found: error
+
+  upload:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token for AWS login
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: podman-*
+          merge-multiple: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: ap-southeast-2
+          role-to-assume: arn:aws:iam::143295493206:role/gha-ops-scripts-s3
+          role-session-name: GHA@Ops=Podman
+
+      - name: Upload
+        run: |
+          for f in podman-*; do
+            aws s3 cp $f s3://bes-ops-tools/podman/${{ env.PODMAN_VERSION }}/$f --no-progress
+          done
+
+      - name: Clear cache
+        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths '/podman/*'

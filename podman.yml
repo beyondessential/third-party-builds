@@ -26,10 +26,12 @@ jobs:
             name: x86_64-unknown-linux-gnu
             goos: linux
             goarch: amd64
-          - os: ubuntu-24.04
-            name: aarch64-unknown-linux-gnu
-            goos: linux
-            goarch: arm64
+            debarch: amd64
+          # - os: Linux-ARM64
+          #   name: aarch64-unknown-linux-gnu
+          #   goos: linux
+          #   goarch: arm64
+          #   debarch: arm64
 
     runs-on: ${{ matrix.os }}
     env:
@@ -79,10 +81,30 @@ jobs:
       - run: make DESTDIR=$(pwd)/podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }} install
       - run: tar -caf podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}.tar.zst podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
 
+      - name: Make deb
+        run: |
+          mkdir -p podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}/DEBIAN
+          cat <<EOF > podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}/DEBIAN/control
+          Package: podman
+          Version: ${{env.PODMAN_VERSION}}
+          Architecture: ${{ matrix.debarch }}
+          Priority: optional
+          Section: universe/admin
+          Maintainer: BES <support@bes.au>
+          Bugs: https://github.com/containers/podman/issues
+          Depends: conmon, crun | runc, golang-github-containers-common, libc6 (>= 2.38), libdevmapper1.02.1 (>= 2:1.02.97), libgpgme11t64 (>= 1.4.1), libseccomp2 (>= 2.5.0), libsqlite3-0 (>= 3.36.0), libsubid4 (>= 1:4.11.1)
+          Recommends: buildah (>= 1.31), catatonit | tini | dumb-init, dbus-user-session, passt, slirp4netns, uidmap
+          Suggests: containers-storage, docker-compose, podman-compose, iptables
+          Homepage: https://github.com/containers/podman
+          Description: tool to manage containers and pods
+          EOF
+          chown root:root -R podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
+          dpkg -b podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
+
       - uses: actions/upload-artifact@v4
         with:
           name: podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
-          path: podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}.tar.zst
+          path: podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}.*
           if-no-files-found: error
 
   upload:

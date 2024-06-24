@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: containers/crun
-          ref: v${{ env.CRUN_VERSION }}
+          ref: ${{ env.CRUN_VERSION }}
 
       - name: Write script
         run: |

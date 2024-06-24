@@ -14,7 +14,7 @@ concurrency:
 
 env:
   GO_VERSION: 1.22
-  CRUN_VERSION: 5.1.1
+  CRUN_VERSION: 1.15
 
 jobs:
   build:

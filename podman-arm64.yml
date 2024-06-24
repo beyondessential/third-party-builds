@@ -46,6 +46,7 @@ jobs:
           cat <<EOFSCRIPT >build.sh
           #!/bin/bash
           set -euxo pipefail
+          apt update
           apt install -y \
             btrfs-progs \
             conmon \

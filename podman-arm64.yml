@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/podman-arm64.yml
+      - .github/workflows/podman.yml
 
 concurrency:
   group: ${{ github.workflow }}
@@ -29,25 +29,24 @@ jobs:
             debarch: arm64
 
     runs-on: ${{ matrix.os }}
-    container: ubuntu:24.04
     env:
       GOOS: ${{ matrix.goos }}
       GOARCH: ${{ matrix.goarch }}
     steps:
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - name: Checkout podman source
         uses: actions/checkout@v4
         with:
           repository: containers/podman
           ref: v${{ env.PODMAN_VERSION }}
 
-      - name: Install podman dependencies
+      - run: sudo sysctl kernel.unprivileged_userns_clone=1
+
+      - name: Write script
         run: |
-          sudo apt install -y \
+          cat <<EOFSCRIPT >/tmp/build.sh
+          #!/bin/bash
+          set -euxo pipefail
+          apt install -y \
             btrfs-progs \
             conmon \
             crun \
@@ -71,15 +70,12 @@ jobs:
             netavark \
             pkg-config \
             uidmap
-          sudo sysctl kernel.unprivileged_userns_clone=1
 
-      - run: make BUILDTAGS="apparmor cni seccomp systemd exclude_graphdriver_devicemapper" PREFIX=/usr
-      - run: mkdir podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
-      - run: make DESTDIR=$(pwd)/podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }} install
-      - run: tar -caf podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}.tar.zst podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
+          make BUILDTAGS="apparmor cni seccomp systemd exclude_graphdriver_devicemapper" PREFIX=/usr
+          mkdir podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
+          make DESTDIR=/build/podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }} install
+          tar -caf podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}.tar.zst podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
 
-      - name: Make deb
-        run: |
           mkdir -p podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}/DEBIAN
           cat <<EOF > podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}/DEBIAN/control
           Package: podman
@@ -96,6 +92,12 @@ jobs:
           Description: tool to manage containers and pods
           EOF
           dpkg-deb --root-owner-group -b podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
+          EOFSCRIPT
+
+      - name: Run container
+        run: |
+          sudo apt install -y docker.io
+          docker run --rm --privileged -v $(pwd):/build -w /build /tmp/build.sh
 
       - uses: actions/upload-artifact@v4
         with:

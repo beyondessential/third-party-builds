@@ -97,7 +97,7 @@ jobs:
       - name: Run container
         run: |
           sudo apt update && sudo apt install -y docker.io
-          sudo docker run --rm -v $(pwd):/build -w /build /tmp/build.sh
+          sudo docker run --rm -v $(pwd):/build -w /build ubuntu:24.04 /tmp/build.sh
 
       - uses: actions/upload-artifact@v4
         with:

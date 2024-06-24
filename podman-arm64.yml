@@ -76,6 +76,7 @@ jobs:
           echo ::endgroup::
 
           echo ::group::Build podman
+          git config --global --add safe.directory /build
           make BUILDTAGS="apparmor cni seccomp systemd exclude_graphdriver_devicemapper" PREFIX=/usr
           mkdir podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
           make DESTDIR=/build/podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }} install

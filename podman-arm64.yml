@@ -46,6 +46,7 @@ jobs:
           cat <<EOFSCRIPT >build.sh
           #!/bin/bash
           set -euxo pipefail
+          echo ::group::Install dependencies
           apt update
           apt install -y \
             btrfs-progs \
@@ -72,12 +73,16 @@ jobs:
             netavark \
             pkg-config \
             uidmap
+          echo ::endgroup::
 
+          echo ::group::Build podman
           make BUILDTAGS="apparmor cni seccomp systemd exclude_graphdriver_devicemapper" PREFIX=/usr
           mkdir podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
           make DESTDIR=/build/podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }} install
           tar -caf podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}.tar.zst podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
+          echo ::endgroup::
 
+          echo ::group::Make deb
           mkdir -p podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}/DEBIAN
           cat <<EOF > podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}/DEBIAN/control
           Package: podman
@@ -94,6 +99,7 @@ jobs:
           Description: tool to manage containers and pods
           EOF
           dpkg-deb --root-owner-group -b podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
+          echo ::endgroup::
           EOFSCRIPT
 
       - name: Run container

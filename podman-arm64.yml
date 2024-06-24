@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/podman.yml
+      - .github/workflows/podman-arm64.yml
 
 concurrency:
   group: ${{ github.workflow }}

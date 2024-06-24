@@ -1,0 +1,122 @@
+name: Build and upload crun to S3
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/crun.yml
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  CRUN_VERSION: 1.14
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            name: x86_64-unknown-linux-gnu
+            goos: linux
+            goarch: amd64
+            debarch: amd64
+          # - os: Linux-ARM64-24.04
+          #   name: aarch64-unknown-linux-gnu
+          #   goos: linux
+          #   goarch: arm64
+          #   debarch: arm64
+
+    runs-on: ${{ matrix.os }}
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+    steps:
+      - name: Checkout podman source
+        uses: actions/checkout@v4
+        with:
+          repository: containers/crun
+          ref: v${{ env.CRUN_VERSION }}
+
+      - name: Install podman dependencies
+        run: |
+          sudo apt install -y \
+            autoconf \
+            automake \
+            build-essential \
+            gcc \
+            git \
+            go-md2man \
+            libcap-dev \
+            libprotobuf-c \-dev
+            libseccomp-dev \
+            libsystemd-dev \
+            libtool \
+            libyajl-dev \
+            make \
+            pkgconf \
+            python3
+
+      - run: ./autogen.sh
+      - run: ./configure PREFIX=/usr
+      - run: make PREFIX=/usr
+      - run: mkdir crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}
+      - run: make DESTDIR=$(pwd)/crun-${{ matrix.name }}-${{ env.CRUN_VERSION }} install
+      - run: tar -caf crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}.tar.zst crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}
+
+      - name: Make deb
+        run: |
+          mkdir -p crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}/DEBIAN
+          cat <<EOF > crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}/DEBIAN/control
+          Package: crun
+          Version: ${{env.CRUN_VERSION}}
+          Architecture: ${{ matrix.debarch }}
+          Priority: optional
+          Section: universe/admin
+          Maintainer: BES <support@bes.au>
+          Bugs: https://github.com/containers/crun/issues
+          Depends: libc6 (>= 2.38), libcap2 (>= 1:2.10), libseccomp2 (>= 2.3.0), libsystemd0 (>= 246), libyajl2 (>= 2.0.4)
+          Suggests: libwasmedge0
+          Homepage: https://github.com/containers/crun
+          Description:  lightweight OCI runtime for running containers
+          EOF
+          dpkg-deb --root-owner-group -b crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}
+          path: crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}.*
+          if-no-files-found: error
+
+  upload:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token for AWS login
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: crun-*
+          merge-multiple: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: ap-southeast-2
+          role-to-assume: arn:aws:iam::143295493206:role/gha-ops-scripts-s3
+          role-session-name: GHA@Ops=crun
+
+      - name: Upload
+        run: |
+          for f in crun-*; do
+            aws s3 cp $f s3://bes-ops-tools/crun/${{ env.CRUN_VERSION }}/$f --no-progress
+          done
+
+      - name: Clear cache
+        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths '/crun/*'

@@ -53,7 +53,7 @@ jobs:
             git \
             go-md2man \
             libcap-dev \
-            libprotobuf-c \-dev
+            libprotobuf-c-dev
             libseccomp-dev \
             libsystemd-dev \
             libtool \

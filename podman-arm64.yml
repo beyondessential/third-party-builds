@@ -49,6 +49,7 @@ jobs:
           apt update
           apt install -y \
             btrfs-progs \
+            build-essential \
             conmon \
             crun \
             git \

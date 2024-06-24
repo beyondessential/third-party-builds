@@ -72,7 +72,8 @@ jobs:
             libsystemd-dev \
             netavark \
             pkg-config \
-            uidmap
+            uidmap \
+            zstd
           echo ::endgroup::
 
           echo ::group::Build podman

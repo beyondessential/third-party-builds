@@ -1,4 +1,4 @@
-name: Build and upload podman to S3
+name: Build and upload podman to S3 (arm64)
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/podman.yml
+      - .github/workflows/podman-arm64.yml
 
 concurrency:
   group: ${{ github.workflow }}
@@ -22,22 +22,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
-            name: x86_64-unknown-linux-gnu
+          - os: Linux-ARM64
+            name: aarch64-unknown-linux-gnu
             goos: linux
-            goarch: amd64
-            debarch: amd64
-          # - os: Linux-ARM64-24.04
-          #   name: aarch64-unknown-linux-gnu
-          #   goos: linux
-          #   goarch: arm64
-          #   debarch: arm64
+            goarch: arm64
+            debarch: arm64
 
     runs-on: ${{ matrix.os }}
+    container: ubuntu:24.04
     env:
       GOOS: ${{ matrix.goos }}
       GOARCH: ${{ matrix.goarch }}
     steps:
+
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}

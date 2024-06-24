@@ -105,7 +105,9 @@ jobs:
 
       - name: Run container
         run: |
+          echo ::group::Install docker
           sudo apt update && sudo apt install -y docker.io
+          echo ::endgroup::
           sudo docker run --rm -v $(pwd):/build -w /build ubuntu:24.04 \
             bash build.sh
 

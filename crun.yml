@@ -8,6 +8,10 @@ on:
     paths:
       - .github/workflows/crun.yml
 
+permissions:
+  id-token: write
+  attestations: write
+
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
@@ -87,6 +91,9 @@ jobs:
           EOF
           dpkg-deb --root-owner-group -b crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}
 
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}.*
       - uses: actions/upload-artifact@v4
         with:
           name: crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}

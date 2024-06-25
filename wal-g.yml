@@ -8,6 +8,10 @@ on:
     paths:
       - .github/workflows/wal-g.yml
 
+permissions:
+  id-token: write
+  attestations: write
+
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
@@ -99,6 +103,10 @@ jobs:
           # Go doesn't add `exe` extension when building on Windows.
           # https://github.com/golang/go/issues/59790
           mv main/pg/wal-g wal-g-${{ matrix.name }}$ext
+
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: wal-g-${{ matrix.name }}*
       - uses: actions/upload-artifact@v4
         with:
           name: wal-g-${{ matrix.name }}

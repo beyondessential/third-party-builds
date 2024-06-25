@@ -12,6 +12,10 @@ concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
 
+permissions:
+  id-token: write
+  attestations: write
+
 env:
   GO_VERSION: 1.22
   PODMAN_VERSION: 5.1.1
@@ -100,6 +104,9 @@ jobs:
           EOF
           dpkg-deb --root-owner-group -b podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
 
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}.*
       - uses: actions/upload-artifact@v4
         with:
           name: podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}

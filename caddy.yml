@@ -8,6 +8,10 @@ on:
     paths:
       - .github/workflows/caddy.yml
 
+permissions:
+  id-token: write
+  attestations: write
+
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
@@ -58,12 +62,14 @@ jobs:
           ext=""
           [[ "${{ runner.os }}" == windows* ]] && ext=".exe"
           mv caddy$ext caddy-${{ matrix.name }}$ext
+
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: caddy-${{ matrix.name }}*
       - uses: actions/upload-artifact@v4
         with:
           name: caddy-${{ matrix.name }}
-          path: |
-            caddy*
-            caddy*.exe
+          path: caddy-${{ matrix.name }}*
           if-no-files-found: error
 
   upload:
@@ -77,16 +83,6 @@ jobs:
         with:
           pattern: caddy-*
           merge-multiple: true
-
-      - name: Sign binaries
-        env:
-          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
-        run: |
-          curl -Lo bestool https://tools.ops.tamanu.io/bestool/gha/${{ runner.os }}-${{ runner.arch }}
-          chmod +x bestool
-          ./bestool crypto sign --key-env SIGNING_KEY  \
-            --comment 'ts={timestamp} repo=${{ github.repository }} commit=${{ github.sha }} gharun=${{ github.run_id }}' \
-            caddy-*
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2

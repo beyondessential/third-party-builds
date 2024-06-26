@@ -1,4 +1,4 @@
-name: Build and upload crun to S3
+name: crun
 
 on:
   workflow_dispatch:

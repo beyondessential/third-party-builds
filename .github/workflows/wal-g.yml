@@ -1,4 +1,4 @@
-name: Build and upload WAL-G to S3
+name: WAL-G
 
 on:
   workflow_dispatch:

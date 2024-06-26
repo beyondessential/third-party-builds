@@ -1,4 +1,4 @@
-name: '[Glue] Open mSupply server'
+name: Open mSupply server
 
 on:
   pull_request:

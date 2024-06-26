@@ -1,4 +1,4 @@
-name: Build and upload podman to S3 (arm64)
+name: Podman (arm64)
 
 on:
   workflow_dispatch:

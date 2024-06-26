@@ -1,4 +1,4 @@
-name: Build and upload our custom caddy to S3
+name: Caddy
 
 on:
   workflow_dispatch:

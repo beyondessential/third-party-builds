@@ -1,4 +1,4 @@
-name: Build and upload crun to S3 (arm64)
+name: crun (arm64)
 
 on:
   workflow_dispatch:

@@ -130,7 +130,7 @@ jobs:
         with:
           aws-region: ap-southeast-2
           role-to-assume: arn:aws:iam::143295493206:role/gha-ops-scripts-s3
-          role-session-name: GHA@Ops=Podman
+          role-session-name: GHA@3PB=Podman
 
       - name: Upload
         run: |

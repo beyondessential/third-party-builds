@@ -26,53 +26,15 @@ jobs:
           path: honeyvent.exe
           if-no-files-found: error
 
-  upload:
-    needs: build-honeyvent
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write # OIDC token for AWS login
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
-        with:
-          name: honeyvent
-
-      - name: Get minisign
-        run: |
-          set -ex
-          curl --proto '=https' --tlsv1.2 -LO https://github.com/jedisct1/minisign/releases/download/0.11/minisign-0.11-linux.tar.gz
-          echo 'f0a0954413df8531befed169e447a66da6868d79052ed7e892e50a4291af7ae0  minisign-0.11-linux.tar.gz' | sha256sum -c
-          tar -xvf minisign-0.11-linux.tar.gz
-          mv minisign-linux/x86_64/minisign .
-      - name: Sign build
-        env:
-          MINISIGN_KEY: ${{ secrets.SIGNING_KEY }}
-        run: |
-          set -e
-          echo "$MINISIGN_KEY" > minisign.key
-          set -x
-          ./minisign -R \
-            -s minisign.key \
-            -p minisign.pub
-          ./minisign -S \
-            -s minisign.key \
-            -m honeyvent.exe \
-            -x honeyvent.exe.sig \
-            -t "built on $(date --iso-8601=seconds) from ops/$(git rev-parse HEAD)"
-          rm minisign.*
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-region: ap-southeast-2
           role-to-assume: arn:aws:iam::143295493206:role/gha-ops-scripts-s3
-          role-session-name: GHA@Ops=Honeyvent
+          role-session-name: GHA@3PB=Honeyvent
 
       - name: Upload
-        run: |
-          aws s3 cp honeyvent.exe s3://bes-ops-tools/honeyvent.exe --no-progress
-          aws s3 cp honeyvent.exe.sig s3://bes-ops-tools/honeyvent.exe.sig --no-progress
+        run: aws s3 cp honeyvent.exe s3://bes-ops-tools/honeyvent.exe --no-progress
 
       - name: Clear cache
         run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths '/honeyvent.*'

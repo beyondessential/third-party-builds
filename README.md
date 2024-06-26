@@ -66,6 +66,18 @@ https://tools.ops.tamanu.io/crun/{version}/crun-{target}-{version}.tar.zst
 https://tools.ops.tamanu.io/crun/{version}/crun-{target}-{version}.deb
 ```
 
+### [Open mSupply](./.github/workflows/msupply.yml)
+
+- Upstream: <https://msupply.foundation/open-msupply/>
+- Targets: Linux (x64 and ARM64)
+- Package: container images
+
+Reason: upstream doesn't provide Linux builds.
+
+```
+ghcr.io/beyondessential/msupply-server:v{version}
+```
+
 ### [Podman](./.github/workflows/podman.yml)
 
 - Upstream: <https://github.com/containers/podman>

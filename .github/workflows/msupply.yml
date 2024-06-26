@@ -3,13 +3,13 @@ name: Open mSupply server
 on:
   pull_request:
     paths:
-      - glue/msupply-server/**
+      - msupply-server/**
       - .github/workflows/msupply.yml
   push:
     branches:
       - main
     paths:
-      - glue/msupply-server/**
+      - msupply-server/**
       - .github/workflows/msupply.yml
 
 concurrency:
@@ -18,7 +18,12 @@ concurrency:
 
 permissions:
   contents: read
-  id-token: write # OIDC token for ECR login
+  id-token: write
+  attestations: write
+  packages: write
+
+env:
+  MSUPPLY_VERSION: 2.0.3
 
 jobs:
   build:
@@ -61,30 +66,39 @@ jobs:
       - name: Setup buildkit
         uses: docker/setup-buildx-action@v2
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - uses: docker/metadata-action@v5
+        id: meta
         with:
-          aws-region: ap-southeast-2
-          role-to-assume: arn:aws:iam::143295493206:role/gha-image-push
-          role-session-name: GHA@Ops=BuildMSupply
+          labels: |
+            org.opencontainers.image.title=Open mSupply server
+            org.opencontainers.image.url=https://msupply.foundation/open-msupply/
+            org.opencontainers.image.source=https://github.com/msupply-foundation/open-msupply
+            org.opencontainers.image.version=${{ env.MSUPPLY_VERSION }}
+            org.opencontainers.image.licenses=AGPL-3.0
 
-      - name: Login to ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build container image
-        uses: docker/build-push-action@v4
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v5
         with:
-          context: glue/msupply-server
-          file: glue/msupply-server/Dockerfile
+          context: .
           platforms: linux/${{ matrix.platform.arch }}
+          cache-from: type=gha,scope=msupply-${{ matrix.platform.arch }}
+          cache-to: type=gha,mode=max,scope=msupply-${{ matrix.platform.arch }}
+          build-args: MSUPPLY_REF=v${{ env.MSUPPLY_VERSION }}
           push: ${{ github.event_name == 'push' }} # ie to main
-          tags: |
-            ${{ steps.login-ecr.outputs.registry }}/tamanu/msupply:sha-${{ github.sha }}.${{ matrix.platform.arch }}
-            ${{ steps.login-ecr.outputs.registry }}/tamanu/msupply:latest.${{ matrix.platform.arch }}
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ghcr.io/beyondessential/msupply-server:v${{ env.MSUPPLY_VERSION }}.${{ matrix.platform.arch }}
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ghcr.io/beyondessential/msupply-server:v${{ env.MSUPPLY_VERSION }}.${{ matrix.platform.arch }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
 
   multi-arch:
     needs: build
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     name: Multi-arch image
     steps:
@@ -94,24 +108,10 @@ jobs:
           tar -xvf manifest-tool.tar.gz manifest-tool-linux-amd64
           mv manifest-tool-linux-amd64 manifest-tool
           chmod +x manifest-tool
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-region: ap-southeast-2
-          role-to-assume: arn:aws:iam::143295493206:role/gha-image-push
-          role-session-name: GHA@Ops=CombineImageMSupply
-
-      - name: Login to ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Combine images
         run: |
           ./manifest-tool push from-args \
             --platforms linux/amd64,linux/arm64 \
-            --template ${{ steps.login-ecr.outputs.registry }}/tamanu/msupply:sha-${{ github.sha }}.ARCH \
-            --target ${{ steps.login-ecr.outputs.registry }}/tamanu/msupply:sha-${{ github.sha }}
-          ./manifest-tool push from-args \
-            --platforms linux/amd64,linux/arm64 \
-            --template ${{ steps.login-ecr.outputs.registry }}/tamanu/msupply:latest.ARCH \
-            --target ${{ steps.login-ecr.outputs.registry }}/tamanu/msupply:latest
+            --template ghcr.io/beyondessential/msupply-server:v${{ env.MSUPPLY_VERSION }}.ARCH \
+            --target ghcr.io/beyondessential/msupply-server:v${{ env.MSUPPLY_VERSION }}

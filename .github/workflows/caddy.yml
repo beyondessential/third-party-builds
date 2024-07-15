@@ -63,9 +63,9 @@ jobs:
           [[ "${{ runner.os }}" == windows* ]] && ext=".exe"
           mv caddy$ext caddy-${{ matrix.name }}$ext
 
-      - uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: caddy-${{ matrix.name }}*
+      #- uses: actions/attest-build-provenance@v1
+      #  with:
+      #    subject-path: caddy-${{ matrix.name }}*
       - uses: actions/upload-artifact@v4
         with:
           name: caddy-${{ matrix.name }}

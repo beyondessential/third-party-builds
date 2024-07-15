@@ -90,12 +90,12 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           tags: ghcr.io/beyondessential/msupply-server:v${{ env.MSUPPLY_VERSION }}.${{ matrix.platform.arch }}
 
-      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-name: ghcr.io/beyondessential/msupply-server:v${{ env.MSUPPLY_VERSION }}.${{ matrix.platform.arch }}
-          subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
+      #- name: Generate artifact attestation
+      #  uses: actions/attest-build-provenance@v1
+      #  with:
+      #    subject-name: ghcr.io/beyondessential/msupply-server:v${{ env.MSUPPLY_VERSION }}.${{ matrix.platform.arch }}
+      #    subject-digest: ${{ steps.build.outputs.digest }}
+      #    push-to-registry: true
 
   multi-arch:
     needs: build

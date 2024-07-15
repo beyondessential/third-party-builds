@@ -80,9 +80,9 @@ jobs:
           # https://github.com/golang/go/issues/59790
           mv main/pg/wal-g wal-g-${{ matrix.name }}$ext
 
-      - uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: wal-g-${{ matrix.name }}*
+      #- uses: actions/attest-build-provenance@v1
+      #  with:
+      #    subject-path: wal-g-${{ matrix.name }}*
       - uses: actions/upload-artifact@v4
         with:
           name: wal-g-${{ matrix.name }}

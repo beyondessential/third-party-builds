@@ -106,9 +106,9 @@ jobs:
           sudo docker run --rm -v $(pwd):/build -w /build ubuntu:24.04 \
             bash build.sh
 
-      - uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}.*
+      #- uses: actions/attest-build-provenance@v1
+      #  with:
+      #    subject-path: crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}.*
       - uses: actions/upload-artifact@v4
         with:
           name: crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}

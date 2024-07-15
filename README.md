@@ -26,6 +26,9 @@ This is both to provide a consistent scheme between various different build syst
 
 ### Attestations
 
+> [!CAUTION]
+> This is currently disabled as not available for private repos, and ARM64 isn't available for public repos.
+
 These builds are signed with [Artifact Attestations](https://docs.github.com/en/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds), so that integrity and provenance can be tested with:
 
 ```console

@@ -116,9 +116,9 @@ jobs:
           sudo docker run --rm -v $(pwd):/build -w /build ubuntu:24.04 \
             bash build.sh
 
-      - uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}.*
+      #- uses: actions/attest-build-provenance@v1
+      #  with:
+      #    subject-path: podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}.*
       - uses: actions/upload-artifact@v4
         with:
           name: podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}

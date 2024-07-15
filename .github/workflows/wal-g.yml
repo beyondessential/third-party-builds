@@ -18,7 +18,7 @@ concurrency:
 
 env:
   GO_VERSION: "1.20"
-  WALG_VERSION: 3.0.0
+  WALG_VERSION: 3.0.2
 
 jobs:
   build:
@@ -60,8 +60,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: wal-g/wal-g
-          # use master until new release >3.0.0
-          # ref: v${{ env.WALG_VERSION }}
+          ref: v${{ env.WALG_VERSION }}
 
       - name: Install wal-g dependencies
         if: contains(matrix.name, 'linux')

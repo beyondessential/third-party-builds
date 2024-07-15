@@ -18,7 +18,7 @@ permissions:
 
 env:
   GO_VERSION: 1.22
-  PODMAN_VERSION: 5.1.2+patch
+  PODMAN_VERSION: 5.1.2.1
 
 jobs:
   build:

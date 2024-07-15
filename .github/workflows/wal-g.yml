@@ -70,29 +70,6 @@ jobs:
         if: contains(matrix.name, 'darwin')
         run: brew install cmake
 
-      - name: Apply the patch for `backup-push`
-        run: |
-          cat <<EOF > ./fix-1028-backup-push-connection-cancelled-by-remote-host.patch
-          diff --git a/internal/databases/postgres/backup_push_handler.go b/internal/databases/postgres/backup_push_handler.go
-          index 3be47a3..8b42d0f 100644
-          --- a/internal/databases/postgres/backup_push_handler.go
-          +++ b/internal/databases/postgres/backup_push_handler.go
-          @@ -582,10 +582,7 @@ func GetPgServerInfo(keepRunner bool) (pgInfo BackupPgInfo, runner *PgQueryRunne
-           	tracelog.DebugLogger.Printf("Timeline: %d", pgInfo.Timeline)
-
-           	if !keepRunner {
-          -		err = tmpConn.Close()
-          -		if err != nil {
-          -			return pgInfo, nil, err
-          -		}
-          +		utility.LoggedClose(tmpConn, "")
-           		return pgInfo, nil, err
-           	}
-
-          EOF
-          git apply fix-1028-backup-push-connection-cancelled-by-remote-host.patch
-        shell: bash
-
       - run: make deps
       - run: make pg_build
 

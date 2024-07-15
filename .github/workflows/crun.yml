@@ -17,6 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  GO_VERSION: 1.22
   CRUN_VERSION: 1.15
 
 jobs:
@@ -64,7 +65,8 @@ jobs:
             libyajl-dev \
             make \
             pkgconf \
-            python3
+            python3 \
+            zstd
 
       - run: ./autogen.sh
       - run: ./configure PREFIX=/usr

@@ -100,9 +100,7 @@ https://tools.ops.tamanu.io/podman/{version}/podman-{target}-{version}.deb
 - Targets: Linux (x64 and ARM64), Windows, macOS (Intel and ARM64)
 - Package: none (raw executable)
 
-Reasons:
-- includes fix for <https://github.com/wal-g/wal-g/issues/1028>,
-- upstream doesn't provide Windows/macOS builds.
+Reasons: upstream doesn't provide Windows/macOS builds.
 
 ```
 https://tools.ops.tamanu.io/wal-g/{version}/wal-g-{target}

@@ -18,7 +18,7 @@ permissions:
 
 env:
   GO_VERSION: 1.22
-  PODMAN_VERSION: 5.1.2
+  PODMAN_VERSION: 5.1.2+patch
 
 jobs:
   build:
@@ -49,8 +49,10 @@ jobs:
       - name: Checkout podman source
         uses: actions/checkout@v4
         with:
-          repository: containers/podman
-          ref: v${{ env.PODMAN_VERSION }}
+          #repository: containers/podman
+          #ref: v${{ env.PODMAN_VERSION }}
+          repository: passcod/podman
+          ref: patch-1
 
       - name: Install podman dependencies
         run: |

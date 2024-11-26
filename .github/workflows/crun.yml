@@ -36,6 +36,11 @@ jobs:
             goos: linux
             goarch: arm64
             debarch: arm64
+          - os: Linux-ARM64-Ubuntu-22.04
+            name: aarch64-unknown-linux-gnu35
+            goos: linux
+            goarch: arm64
+            debarch: arm64
 
     runs-on: ${{ matrix.os }}
     env:

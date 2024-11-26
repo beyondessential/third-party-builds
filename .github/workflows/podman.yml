@@ -66,7 +66,7 @@ jobs:
           sudo apt install -y netavark
       - if: endsWith(matrix.os, '22.04')
         run: |
-          echo 'deb http://archive.ubuntu.com/ubuntu/ noble universe' | sudo tee /etc/apt/sources.list.d/noble.list
+          echo 'deb http://ports.ubuntu.com/ubuntu-ports/ noble universe' | sudo tee /etc/apt/sources.list.d/noble.list
           sudo apt update
           sudo apt install -y netavark
           sudo rm /etc/apt/sources.list.d/noble.list

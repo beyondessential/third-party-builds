@@ -31,16 +31,19 @@ jobs:
             goos: linux
             goarch: amd64
             debarch: amd64
+            glibc: 2.38
           - os: Linux-ARM64-Ubuntu-24.04
             name: aarch64-unknown-linux-gnu
             goos: linux
             goarch: arm64
             debarch: arm64
+            glibc: 2.38
           - os: Linux-ARM64-Ubuntu-22.04
             name: aarch64-unknown-linux-gnu35
             goos: linux
             goarch: arm64
             debarch: arm64
+            glibc: 2.35
 
     runs-on: ${{ matrix.os }}
     env:
@@ -91,7 +94,7 @@ jobs:
           Section: universe/admin
           Maintainer: BES <support@bes.au>
           Bugs: https://github.com/containers/crun/issues
-          Depends: libc6 (>= 2.36), libcap2 (>= 1:2.10), libseccomp2 (>= 2.3.0), libsystemd0 (>= 246), libyajl2 (>= 2.0.4)
+          Depends: libc6 (>= ${{ matrix.glibc }}), libcap2 (>= 1:2.10), libseccomp2 (>= 2.3.0), libsystemd0 (>= 246), libyajl2 (>= 2.0.4)
           Suggests: libwasmedge0
           Homepage: https://github.com/containers/crun
           Description:  lightweight OCI runtime for running containers

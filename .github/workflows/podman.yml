@@ -60,6 +60,10 @@ jobs:
           repository: containers/podman
           ref: v${{ env.PODMAN_VERSION }}
 
+      - if: endsWith(matrix.os, '24.04')
+        run: |
+          sudo apt update
+          sudo apt install -y netavark
       - if: endsWith(matrix.os, '22.04')
         run: |
           echo 'deb http://archive.ubuntu.com/ubuntu/ noble universe' | sudo tee /etc/apt/sources.list.d/noble.list
@@ -92,7 +96,6 @@ jobs:
             libseccomp-dev \
             libselinux1-dev \
             libsystemd-dev \
-            netavark \
             pkg-config \
             uidmap \
             zstd

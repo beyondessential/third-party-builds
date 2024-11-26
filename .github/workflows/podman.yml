@@ -62,10 +62,11 @@ jobs:
 
       - if: endsWith(matrix.os, '22.04')
         run: |
-          sudo add-apt-repository ppa:quarckster/containers
+          echo 'deb http://archive.ubuntu.com/ubuntu/ noble universe' | sudo tee /etc/apt/sources.list.d/noble.list
           sudo apt update
-          curl -Lo netavark.deb https://launchpad.net/~quarckster/+archive/ubuntu/containers/+files/netavark_1.5.0-vendor-ubuntu1ppa4_amd64.deb
-          sudo dpkg -i netavark.deb
+          sudo apt install -y netavark
+          sudo rm /etc/apt/sources.list.d/noble.list
+          sudo apt update
 
       - name: Install podman dependencies
         run: |

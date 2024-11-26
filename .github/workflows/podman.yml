@@ -60,6 +60,11 @@ jobs:
           repository: containers/podman
           ref: v${{ env.PODMAN_VERSION }}
 
+      - if: endsWith(matrix.os, '22.04')
+        run: |
+          sudo add-apt-repository ppa:quarckster/containers
+          sudo apt update
+
       - name: Install podman dependencies
         run: |
           sudo apt install -y \

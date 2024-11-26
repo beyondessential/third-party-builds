@@ -64,6 +64,8 @@ jobs:
         run: |
           sudo add-apt-repository ppa:quarckster/containers
           sudo apt update
+          curl -Lo netavark.deb https://launchpad.net/~quarckster/+archive/ubuntu/containers/+files/netavark_1.5.0-vendor-ubuntu1ppa4_amd64.deb
+          sudo dpkg -i netavark.deb
 
       - name: Install podman dependencies
         run: |

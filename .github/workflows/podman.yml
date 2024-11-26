@@ -31,11 +31,19 @@ jobs:
             goos: linux
             goarch: amd64
             debarch: amd64
+            glibc: 2.38
           - os: Linux-ARM64-Ubuntu-24.04
             name: aarch64-unknown-linux-gnu
             goos: linux
             goarch: arm64
             debarch: arm64
+            glibc: 2.38
+          - os: Linux-ARM64-Ubuntu-22.04
+            name: aarch64-unknown-linux-gnu35
+            goos: linux
+            goarch: arm64
+            debarch: arm64
+            glibc: 2.35
 
     runs-on: ${{ matrix.os }}
     env:
@@ -98,7 +106,7 @@ jobs:
           Section: universe/admin
           Maintainer: BES <support@bes.au>
           Bugs: https://github.com/containers/podman/issues
-          Depends: conmon, crun | runc, golang-github-containers-common, libc6 (>= 2.38), libdevmapper1.02.1 (>= 2:1.02.97), libgpgme11t64 (>= 1.4.1), libseccomp2 (>= 2.5.0), libsqlite3-0 (>= 3.36.0), libsubid4 (>= 1:4.11.1)
+          Depends: conmon, crun | runc, golang-github-containers-common, libc6 (>= ${{ matrix.glibc }}), libdevmapper1.02.1 (>= 2:1.02.97), libgpgme11t64 (>= 1.4.1), libseccomp2 (>= 2.5.0), libsqlite3-0 (>= 3.36.0), libsubid4 (>= 1:4.11.1)
           Recommends: buildah (>= 1.31), catatonit | tini | dumb-init, dbus-user-session, passt, slirp4netns, uidmap
           Suggests: containers-storage, docker-compose, podman-compose, iptables
           Homepage: https://github.com/containers/podman

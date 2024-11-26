@@ -19,7 +19,6 @@ concurrency:
 env:
   GO_VERSION: 1.22
   CRUN_VERSION: 1.18.2
-  CGO_ENABLED: 0
 
 jobs:
   build:
@@ -70,8 +69,8 @@ jobs:
             zstd
 
       - run: ./autogen.sh
-      - run: ./configure PREFIX=/usr
-      - run: make PREFIX=/usr
+      - run: ./configure PREFIX=/usr CGO_ENABLED=0
+      - run: make PREFIX=/usr CGO_ENABLED=0
       - run: mkdir crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}
       - run: make DESTDIR=$(pwd)/crun-${{ matrix.name }}-${{ env.CRUN_VERSION }} install
       - run: tar -caf crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}.tar.zst crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}

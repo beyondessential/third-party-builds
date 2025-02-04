@@ -17,8 +17,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.20"
-  WALG_VERSION: 3.0.2
+  GO_VERSION: 1.23
+  WALG_VERSION: 3.0.5
 
 jobs:
   build:
@@ -26,11 +26,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             name: x86_64-unknown-linux-gnu
             goos: linux
             goarch: amd64
-          - os: Linux-ARM64-Ubuntu-24.04
+          - os: ubuntu-24.04-arm
             name: aarch64-unknown-linux-gnu
             goos: linux
             goarch: arm64
@@ -80,9 +80,9 @@ jobs:
           # https://github.com/golang/go/issues/59790
           mv main/pg/wal-g wal-g-${{ matrix.name }}$ext
 
-      #- uses: actions/attest-build-provenance@v1
-      #  with:
-      #    subject-path: wal-g-${{ matrix.name }}*
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: wal-g-${{ matrix.name }}*
       - uses: actions/upload-artifact@v4
         with:
           name: wal-g-${{ matrix.name }}
@@ -96,7 +96,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # OIDC token for AWS login
+      id-token: write # OIDC token for AWS login
     steps:
       - uses: actions/download-artifact@v4
         with:

@@ -29,7 +29,7 @@ jobs:
             name: x86_64-unknown-linux-gnu
             goos: linux
             goarch: amd64
-          - os: ubuntu-24.04
+          - os: ubuntu-24.04-arm
             name: aarch64-unknown-linux-gnu
             goos: linux
             goarch: arm64
@@ -63,9 +63,9 @@ jobs:
           [[ "${{ runner.os }}" == windows* ]] && ext=".exe"
           mv caddy$ext caddy-${{ matrix.name }}$ext
 
-      #- uses: actions/attest-build-provenance@v1
-      #  with:
-      #    subject-path: caddy-${{ matrix.name }}*
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: caddy-${{ matrix.name }}*
       - uses: actions/upload-artifact@v4
         with:
           name: caddy-${{ matrix.name }}
@@ -77,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # OIDC token for AWS login
+      id-token: write # OIDC token for AWS login
     steps:
       - uses: actions/download-artifact@v4
         with:

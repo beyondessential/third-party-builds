@@ -23,7 +23,7 @@ permissions:
   packages: write
 
 env:
-  MSUPPLY_VERSION: 2.0.3
+  MSUPPLY_VERSION: 2.5.1
 
 jobs:
   build:
@@ -32,31 +32,12 @@ jobs:
       matrix:
         platform:
           - arch: amd64
-            runs-on: ubuntu-latest
+            runs-on: ubuntu-24.04
           - arch: arm64
-            runs-on: Linux-ARM64-Ubuntu-24.04
+            runs-on: ubuntu-24.04-arm
 
     runs-on: ${{ matrix.platform.runs-on }}
     steps:
-      - name: Install docker (arm64 beta)
-        if: matrix.platform.arch == 'arm64'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ca-certificates curl acl
-          sudo install -m 0755 -d /etc/apt/keyrings
-          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-          sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-          echo \
-            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-            $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-            sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-          sudo apt-get update
-
-          sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-          sudo usermod -aG docker $USER
-          sudo setfacl --modify user:$USER:rw /var/run/docker.sock
-
       - name: Verify docker works
         run: docker run hello-world
 
@@ -90,12 +71,12 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           tags: ghcr.io/beyondessential/msupply-server:v${{ env.MSUPPLY_VERSION }}.${{ matrix.platform.arch }}
 
-      #- name: Generate artifact attestation
-      #  uses: actions/attest-build-provenance@v1
-      #  with:
-      #    subject-name: ghcr.io/beyondessential/msupply-server:v${{ env.MSUPPLY_VERSION }}.${{ matrix.platform.arch }}
-      #    subject-digest: ${{ steps.build.outputs.digest }}
-      #    push-to-registry: true
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ghcr.io/beyondessential/msupply-server:v${{ env.MSUPPLY_VERSION }}.${{ matrix.platform.arch }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
 
   multi-arch:
     needs: build

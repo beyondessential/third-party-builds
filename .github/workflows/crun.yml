@@ -17,8 +17,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: 1.22
-  CRUN_VERSION: 1.18.2
+  GO_VERSION: 1.23
+  CRUN_VERSION: 1.19.1
 
 jobs:
   build:
@@ -32,13 +32,13 @@ jobs:
             goarch: amd64
             debarch: amd64
             glibc: 2.38
-          - os: Linux-ARM64-Ubuntu-24.04
+          - os: ubuntu-24.04-arm
             name: aarch64-unknown-linux-gnu
             goos: linux
             goarch: arm64
             debarch: arm64
             glibc: 2.38
-          - os: Linux-ARM64-Ubuntu-22.04
+          - os: ubuntu-22.04-arm
             name: aarch64-unknown-linux-gnu35
             goos: linux
             goarch: arm64
@@ -101,9 +101,9 @@ jobs:
           EOF
           dpkg-deb --root-owner-group -b crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}
 
-      #- uses: actions/attest-build-provenance@v1
-      #  with:
-      #    subject-path: crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}.*
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}.*
       - uses: actions/upload-artifact@v4
         with:
           name: crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}
@@ -115,7 +115,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # OIDC token for AWS login
+      id-token: write # OIDC token for AWS login
     steps:
       - uses: actions/download-artifact@v4
         with:

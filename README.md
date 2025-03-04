@@ -91,17 +91,3 @@ https://tools.ops.tamanu.io/podman/{version}/podman-{target}-{version}.tar.zst
 https://tools.ops.tamanu.io/podman/{version}/podman-{target}-{version}.deb
 ```
 
-### [WAL-G](./.github/workflows/wal-g.yml)
-
-- Upstream: <https://github.com/wal-g/wal-g>
-- Targets: Linux (x64 and ARM64), Windows, macOS (Intel and ARM64)
-- Package: none (raw executable)
-
-Reasons: upstream doesn't provide Windows/macOS builds.
-
-```
-https://tools.ops.tamanu.io/wal-g/{version}/wal-g-{target}
-https://tools.ops.tamanu.io/wal-g/{version}/wal-g-x86_64-pc-windows-gnu.exe
-https://tools.ops.tamanu.io/wal-g/latest/wal-g-{target}
-https://tools.ops.tamanu.io/wal-g/latest/wal-g-x86_64-pc-windows-gnu.exe
-```

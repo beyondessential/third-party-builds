@@ -17,8 +17,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: 1.23
-  CRUN_VERSION: 1.19.1
+  GO_VERSION: "1.23"
+  CRUN_VERSION: "1.20"
 
 jobs:
   build:

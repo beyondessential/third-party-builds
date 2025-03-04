@@ -17,8 +17,8 @@ permissions:
   attestations: write
 
 env:
-  GO_VERSION: 1.23
-  PODMAN_VERSION: 5.3.2
+  GO_VERSION: "1.23"
+  PODMAN_VERSION: "5.4.0"
 
 jobs:
   build:
@@ -60,10 +60,10 @@ jobs:
           repository: containers/podman
           ref: v${{ env.PODMAN_VERSION }}
 
+      - run: sudo apt update
+
       - if: endsWith(matrix.os, '24.04')
-        run: |
-          sudo apt update
-          sudo apt install -y netavark
+        run: sudo apt install -y netavark
       - if: endsWith(matrix.os, '22.04')
         run: |
           echo 'deb http://ports.ubuntu.com/ubuntu-ports/ noble universe' | sudo tee /etc/apt/sources.list.d/noble.list

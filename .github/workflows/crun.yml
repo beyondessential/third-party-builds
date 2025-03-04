@@ -58,6 +58,7 @@ jobs:
 
       - name: Install podman dependencies
         run: |
+          sudo apt update
           sudo apt install -y \
             autoconf \
             automake \

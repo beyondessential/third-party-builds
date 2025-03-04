@@ -27,6 +27,11 @@ env:
 
 jobs:
   build:
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -79,6 +84,11 @@ jobs:
           push-to-registry: true
 
   multi-arch:
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      packages: write
     needs: build
     if: github.event_name == 'push'
     runs-on: ubuntu-latest

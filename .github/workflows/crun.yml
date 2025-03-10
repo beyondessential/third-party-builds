@@ -32,6 +32,12 @@ jobs:
             goarch: amd64
             debarch: amd64
             glibc: 2.38
+          - os: ubuntu-22.04
+            name: x86_64-unknown-linux-gnu35
+            goos: linux
+            goarch: amd64
+            debarch: amd64
+            glibc: 2.35
           - os: ubuntu-24.04-arm
             name: aarch64-unknown-linux-gnu
             goos: linux

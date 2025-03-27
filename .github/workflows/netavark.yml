@@ -1,0 +1,119 @@
+name: netavark
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/netavark.yml
+
+permissions:
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  NETAVARK_VERSION: "1.14.1"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            name: x86_64-unknown-linux-gnu
+            debarch: amd64
+            glibc: 2.38
+          - os: ubuntu-22.04
+            name: x86_64-unknown-linux-gnu35
+            debarch: amd64
+            glibc: 2.35
+          - os: ubuntu-24.04-arm
+            name: aarch64-unknown-linux-gnu
+            debarch: arm64
+            glibc: 2.38
+          - os: ubuntu-22.04-arm
+            name: aarch64-unknown-linux-gnu35
+            debarch: arm64
+            glibc: 2.35
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout netavark source
+        uses: actions/checkout@v4
+        with:
+          repository: containers/netavark
+          ref: ${{ env.NETAVARK_VERSION }}
+      - run: rustup toolchain install stable --profile minimal
+      - uses: Swatinem/rust-cache@v2
+
+      - run: make
+      - run: mkdir netavark-${{ matrix.name }}-${{ env.NETAVARK_VERSION }}
+      - run: make DESTDIR=$(pwd)/netavark-${{ matrix.name }}-${{ env.NETAVARK_VERSION }} install
+      - run: tar -caf netavark-${{ matrix.name }}-${{ env.NETAVARK_VERSION }}.tar.zst netavark-${{ matrix.name }}-${{ env.NETAVARK_VERSION }}
+
+      - name: Make deb
+        run: |
+          mkdir -p netavark-${{ matrix.name }}-${{ env.NETAVARK_VERSION }}/DEBIAN
+          cat <<EOF > netavark-${{ matrix.name }}-${{ env.NETAVARK_VERSION }}/DEBIAN/control
+          Package: netavark
+          Version: ${{env.NETAVARK_VERSION}}
+          Architecture: ${{ matrix.debarch }}
+          Priority: optional
+          Section: universe/net
+          Maintainer: BES <support@bes.au>
+          Original-Maintainer: Reinhard Tartler <siretart@tauware.de>
+          Bugs: https://github.com/containers/netavark/issues
+          Provides: container-network-stack (= 2)
+          Depends: libc6 (>= ${{ matrix.glibc }}), libgcc-s1 (>= 4.2)
+          Recommends: aardvark-dns
+          Breaks: aardvark-dns (<< 1.4)
+          Enhances: podman
+          Homepage: https://github.com/containers/netavark
+          Description: Rust based network stack for containers
+           Netavark is designed to work with Podman but is also applicable
+           for other OCI container management applications.
+          EOF
+          dpkg-deb --root-owner-group -b netavark-${{ matrix.name }}-${{ env.NETAVARK_VERSION }}
+
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: netavark-${{ matrix.name }}-${{ env.NETAVARK_VERSION }}.*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: netavark-${{ matrix.name }}-${{ env.NETAVARK_VERSION }}
+          path: netavark-${{ matrix.name }}-${{ env.NETAVARK_VERSION }}.*
+          if-no-files-found: error
+
+  upload:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token for AWS login
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: netavark-*
+          merge-multiple: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ap-southeast-2
+          role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload
+          role-session-name: GHA@3PB=netavark
+
+      - name: Upload
+        run: |
+          for f in netavark-*; do
+            aws s3 cp $f s3://bes-ops-tools/netavark/${{ env.NETAVARK_VERSION }}/$f --no-progress
+          done
+
+      - name: Clear cache
+        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths '/netavark/*'

@@ -79,3 +79,16 @@ https://tools.ops.tamanu.io/podman/{version}/podman-{target}-{version}.tar.zst
 https://tools.ops.tamanu.io/podman/{version}/podman-{target}-{version}.deb
 ```
 
+### [Netavark](./.github/workflows/netavark.yml)
+
+- Upstream: <https://github.com/containers/netavark>
+- Targets: Linux (x64 and ARM64)
+- Package: tar.zst and .deb
+
+Reason: .deb packaging for a version compatible with Podman 5.
+
+```
+https://tools.ops.tamanu.io/netavark/{version}/netavark-{target}-{version}.tar.zst
+https://tools.ops.tamanu.io/netavark/{version}/netavark-{target}-{version}.deb
+```
+

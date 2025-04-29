@@ -1,0 +1,126 @@
+name: Otelcol
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/otelcol.yml
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  attestations: write
+
+env:
+  GO_VERSION: "1.24.2"
+  BUILDER_VERSION: "0.124.0"
+  OTELCOL_VERSION: "0.125.0"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            name: x86_64-unknown-linux-gnu
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-24.04-arm
+            name: aarch64-unknown-linux-gnu
+            goos: linux
+            goarch: arm64
+          - os: windows-latest
+            name: x86_64-pc-windows-gnu
+            goos: windows
+            goarch: amd64
+          - os: macos-14
+            name: x86_64-apple-darwin
+            goos: darwin
+            goarch: amd64
+          - os: macos-14
+            name: aarch64-apple-darwin
+            goos: darwin
+            goarch: arm64
+
+    runs-on: ${{ matrix.os }}
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Get builder
+        if: matrix.goos != 'windows'
+        env:
+          url: https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/cmd%2Fbuilder%2Fv${{ env.BUILDER_VERSION }}/ocb_${{ env.BUILDER_VERSION }}_${{ matrix.goos }}_${{ matrix.goarch }}
+        run: |
+          curl --proto '=https' --tlsv1.2 -fL -o ocb "$url"
+          chmod +x ocb
+
+      - name: Get builder
+        if: matrix.goos == 'windows'
+        shell: bash
+        env:
+          url: https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/cmd%2Fbuilder%2Fv${{ env.BUILDER_VERSION }}/ocb_${{ env.BUILDER_VERSION }}_${{ matrix.goos }}_${{ matrix.goarch }}.exe
+        run: curl --proto '=https' --tlsv1.2 -fL -o ocb.exe "$url"
+
+      - name: Configure builder
+        shell: bash
+        run: sed 's/OTELCOL_VERSION/${{ env.OTELCOL_VERSION }}/g' otelcol-builder.yml | tee otelcol-builder-real.yml
+
+      - name: Build
+        shell: bash
+        run: ./ocb --config otelcol-builder-real.yml
+
+      - run: ls -R dist
+      - if: matrix.goos != 'windows'
+        run: mv dist/otelcol-bes otelcol-${{ matrix.name }}-${{ env.OTELCOL_VERSION }}
+      - if: matrix.goos == 'windows'
+        shell: bash
+        run: mv dist/otelcol-bes otelcol-${{ matrix.name }}-${{ env.OTELCOL_VERSION }}.exe
+
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: otelcol-${{ matrix.name }}-${{ env.OTELCOL_VERSION }}*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: otelcol-${{ matrix.name }}-${{ env.OTELCOL_VERSION }}
+          path: otelcol-${{ matrix.name }}-${{ env.OTELCOL_VERSION }}*
+          if-no-files-found: error
+
+  upload:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token for AWS login
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: otelcol-*
+          merge-multiple: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ap-southeast-2
+          role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload
+          role-session-name: GHA@3PB=OTelCol
+
+      - name: Upload
+        run: |
+          for f in otelcol-*; do
+            aws s3 cp $f s3://bes-ops-tools/otelcol/${{ env.OTELCOL_VERSION }}/$f --no-progress
+          done
+
+      - name: Clear cache
+        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths '/otelcol/*'

@@ -1,0 +1,58 @@
+dist:
+  name: otelcol-bes
+  description: BES OpenTelemetry Collector
+  output_path: ./dist
+
+extensions:
+  - gomod: go.opentelemetry.io/collector/extension/memorylimiterextension vOTELCOL_VERSION
+  - gomod: go.opentelemetry.io/collector/extension/zpagesextension vOTELCOL_VERSION
+
+  # AWS authentication
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/sigv4authextension vOTELCOL_VERSION
+
+exporters:
+  - gomod: go.opentelemetry.io/collector/exporter/debugexporter vOTELCOL_VERSION
+  - gomod: go.opentelemetry.io/collector/exporter/nopexporter vOTELCOL_VERSION
+  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter vOTELCOL_VERSION
+  - gomod: go.opentelemetry.io/collector/exporter/otlphttpexporter vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/awss3exporter vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/influxdbexporter vOTELCOL_VERSION
+
+  # traces to AWS
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/awsxrayexporter vOTELCOL_VERSION
+
+  # logs to AWS
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/awscloudwatchlogsexporter vOTELCOL_VERSION
+
+  # metrics to AWS
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/awsemfexporter vOTELCOL_VERSION
+
+receivers:
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/haproxyreceiver vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/journaldreceiver vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mysqlreceiver vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/osqueryreceiver vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/podmanreceiver vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/postgresqlreceiver vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlqueryreceiver vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/systemdreceiver vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/tlscheckreceiver vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver vOTELCOL_VERSION
+
+processors:
+  - gomod: go.opentelemetry.io/collector/processor/batchprocessor vOTELCOL_VERSION
+  - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/logdedupprocessor vOTELCOL_VERSION
+
+providers:
+  - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.31.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.31.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider vOTELCOL_VERSION

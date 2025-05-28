@@ -6,6 +6,7 @@ dist:
 extensions:
   - gomod: go.opentelemetry.io/collector/extension/memorylimiterextension vOTELCOL_VERSION
   - gomod: go.opentelemetry.io/collector/extension/zpagesextension vOTELCOL_VERSION
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage vOTELCOL_VERSION
 
   # AWS authentication
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/sigv4authextension vOTELCOL_VERSION

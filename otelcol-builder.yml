@@ -1,5 +1,5 @@
 dist:
-  name: otelcol-bes
+  name: otelcol
   description: BES OpenTelemetry Collector
   output_path: ./dist
 

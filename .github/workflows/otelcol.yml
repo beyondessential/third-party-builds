@@ -84,10 +84,10 @@ jobs:
 
       - run: ls -R dist
       - if: matrix.goos != 'windows'
-        run: mv dist/otelcol-bes otelcol-${{ matrix.name }}-${{ env.OTELCOL_VERSION }}
+        run: mv dist/otelcol otelcol-${{ matrix.name }}-${{ env.OTELCOL_VERSION }}
       - if: matrix.goos == 'windows'
         shell: bash
-        run: mv dist/otelcol-bes otelcol-${{ matrix.name }}-${{ env.OTELCOL_VERSION }}.exe
+        run: mv dist/otelcol otelcol-${{ matrix.name }}-${{ env.OTELCOL_VERSION }}.exe
 
       - uses: actions/attest-build-provenance@v1
         with:

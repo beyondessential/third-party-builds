@@ -58,7 +58,8 @@ jobs:
           xcaddy build v${{ env.CADDY_VERSION }} \
             --with github.com/caddy-dns/route53@v1.5.0 \
             --with github.com/caddy-dns/azure@v0.5.0 \
-            --with github.com/mholt/caddy-ratelimit
+            --with github.com/mholt/caddy-ratelimit \
+            --with github.com/mholt/caddy-l4
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}

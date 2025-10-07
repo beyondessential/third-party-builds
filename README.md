@@ -46,7 +46,7 @@ Notably, builds may disappear or change at any moment without notice.
 - Targets: Linux (x64 and ARM64), Windows, macOS (Intel and ARM64)
 - Package: none (raw executable)
 
-Reason: includes the [Route53 DNS plugin](https://github.com/caddy-dns/route53).
+Reason: includes the [Route53 DNS](https://github.com/caddy-dns/route53) and other plugins.
 
 ```
 https://tools.ops.tamanu.io/caddy/{version}/caddy-{target}

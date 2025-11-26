@@ -151,10 +151,12 @@ jobs:
 
   test-repo:
     needs: generate-repo
-    runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [amd64]
+        os:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Wait for CloudFront cache to clear
         run: sleep 30
@@ -176,6 +178,7 @@ jobs:
 
       - name: Verify installations
         run: |
+          set -x
           caddy version
           crun --version
           /usr/local/libexec/podman/netavark --version

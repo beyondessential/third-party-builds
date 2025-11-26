@@ -76,6 +76,7 @@ jobs:
         run: |
           ext=""
           [[ "${{ runner.os }}" == windows* ]] && ext=".exe"
+          stat caddy$ext
           mv caddy$ext caddy-${{ matrix.name }}$ext
 
       - name: Make deb (Linux only)

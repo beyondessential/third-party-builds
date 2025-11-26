@@ -82,6 +82,8 @@ jobs:
         if: matrix.goos == 'linux'
         shell: bash
         run: |
+          set -x
+
           mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/usr/bin
           mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/config
           mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/snippets

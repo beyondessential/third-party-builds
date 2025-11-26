@@ -46,27 +46,29 @@ jobs:
 
       - name: Download all .deb files from S3
         run: |
-          mkdir -p repo/pool
-          aws s3 sync s3://bes-ops-tools/crun/ repo/pool/crun/ --exclude "*" --include "*.deb" --no-progress
-          aws s3 sync s3://bes-ops-tools/podman/ repo/pool/podman/ --no-progress --exclude "*" --include "*.deb"
-          aws s3 sync s3://bes-ops-tools/netavark/ repo/pool/netavark/ --no-progress --exclude "*" --include "*.deb"
-          aws s3 sync s3://bes-ops-tools/caddy/ repo/pool/caddy/ --no-progress --exclude "*" --include "*.deb"
-          aws s3 sync s3://bes-ops-tools/bestool/ repo/pool/bestool/ --no-progress --exclude "*" --include "*.deb"
-          find repo/pool -name "*.deb" -type f
+          for archs in amd64.x86_64 arm64.aarch64
+          do
+            arch=$(cut -d. -f1 <<< "$archs")
+            target=$(cut -d. -f2 <<< "$archs")
+            mkdir -p $arch/repo/pool
+            for dir in crun podman netavark caddy bestool; do
+              aws s3 sync s3://bes-ops-tools/$dir/ $arch/repo/pool/$dir/ --no-progress --exclude "*" --include "*-$arch-*.deb"
+            done
+            find $arch/repo/pool -name "*.deb" -type f
+          done
 
-      - name: Generate repository metadata for amd64
+      - name: Generate repository metadata
         run: |
-          mkdir -p repo/dists/stable/main/binary-amd64
-          cd repo
-          dpkg-scanpackages --arch amd64 pool /dev/null | gzip -9c > dists/stable/main/binary-amd64/Packages.gz
-          dpkg-scanpackages --arch amd64 pool /dev/null > dists/stable/main/binary-amd64/Packages
-
-      - name: Generate repository metadata for arm64
-        run: |
-          mkdir -p repo/dists/stable/main/binary-arm64
-          cd repo
-          dpkg-scanpackages --arch arm64 pool /dev/null | gzip -9c > dists/stable/main/binary-arm64/Packages.gz
-          dpkg-scanpackages --arch arm64 pool /dev/null > dists/stable/main/binary-arm64/Packages
+          for arch in amd64 arm64
+          do
+            pushd $arch/repo
+            mkdir -p dists/stable/main/binary-$arch
+            dpkg-scanpackages --multiversion pool /dev/null > dists/stable/main/binary-$arch/Packages
+            gzip --keep --best dists/stable/main/binary-$arch/Packages
+            bzip2 --keep --best dists/stable/main/binary-$arch/Packages
+            xz --keep -6e dists/stable/main/binary-$arch/Packages
+            popd
+          done
 
       - name: Generate Release file
         run: |
@@ -102,6 +104,7 @@ jobs:
       - name: Sign Release
         run: |
           cd repo/dists/stable
+          cat Release
           gpg --export --armor ${{ vars.GPG_KEY_ID }} > ../../bes-tools.gpg.key
           gpg --batch --yes --no-tty --pinentry-mode loopback --default-key ${{ vars.GPG_KEY_ID }} -abs -o Release.gpg Release
           gpg --batch --yes --no-tty --pinentry-mode loopback --default-key ${{ vars.GPG_KEY_ID }} --clearsign -o InRelease Release

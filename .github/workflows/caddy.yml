@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: 1.25.1
+  GO_VERSION: 1.25.4
   CADDY_VERSION: 2.10.2
 
 jobs:

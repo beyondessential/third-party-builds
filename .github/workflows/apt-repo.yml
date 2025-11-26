@@ -139,3 +139,45 @@ jobs:
           aws cloudfront create-invalidation \
             --distribution-id=EDAG0UBS1MN74 \
             --paths '/apt/*'
+
+  test-repo:
+    needs: generate-repo
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+    steps:
+      - name: Wait for CloudFront cache to clear
+        run: sleep 30
+
+      - name: Add APT repository
+        run: |
+          curl -fsSL https://tools.ops.tamanu.io/apt/bes-tools.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/bes-tools.gpg
+          echo "deb [signed-by=/etc/apt/keyrings/bes-tools.gpg] https://tools.ops.tamanu.io/apt stable main" | sudo tee /etc/apt/sources.list.d/bes-tools.list
+          sudo tee /etc/apt/preferences.d/bes-tools <<EOF
+          Package: *
+          Pin: origin tools.ops.tamanu.io
+          Pin-Priority: 999
+          EOF
+          sudo apt-get update
+
+      - name: Install packages from repository
+        run: |
+          sudo apt-get install -y caddy crun netavark podman
+
+      - name: Verify installations
+        run: |
+          caddy version
+          crun --version
+          netavark --version
+          podman --version
+
+      - name: Check systemd units (caddy)
+        run: |
+          systemctl cat caddy.service
+          systemctl cat caddy.socket
+
+      - name: Verify user/group created
+        run: |
+          id caddy
+          groups caddy

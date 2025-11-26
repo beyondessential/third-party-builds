@@ -57,7 +57,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
+      - run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@v0.4.5
       - shell: bash
         run: |
           xcaddy build v${{ env.CADDY_VERSION }} \

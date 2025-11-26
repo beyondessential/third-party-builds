@@ -1,4 +1,4 @@
-name: Caddy
+name: caddy
 
 on:
   workflow_dispatch:

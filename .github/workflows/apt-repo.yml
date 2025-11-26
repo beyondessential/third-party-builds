@@ -169,7 +169,7 @@ jobs:
         run: |
           caddy version
           crun --version
-          netavark --version
+          /usr/local/libexec/podman/netavark --version
           podman --version
 
       - name: Check systemd units (caddy)

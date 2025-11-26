@@ -46,6 +46,7 @@ jobs:
           aws s3 sync s3://bes-ops-tools/podman/ repo/pool/podman/ --no-progress --exclude "*" --include "*.deb"
           aws s3 sync s3://bes-ops-tools/netavark/ repo/pool/netavark/ --no-progress --exclude "*" --include "*.deb"
           aws s3 sync s3://bes-ops-tools/caddy/ repo/pool/caddy/ --no-progress --exclude "*" --include "*.deb"
+          aws s3 sync s3://bes-ops-tools/bestool/ repo/pool/bestool/ --no-progress --exclude "*" --include "*.deb"
           find repo/pool -name "*.deb" -type f
 
       - name: Generate repository metadata for amd64

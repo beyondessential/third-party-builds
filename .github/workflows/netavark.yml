@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NETAVARK_VERSION: "1.15.0"
+  NETAVARK_VERSION: 1.17.0
 
 jobs:
   build:

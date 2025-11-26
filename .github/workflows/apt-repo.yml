@@ -1,0 +1,150 @@
+name: APT Repository
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["crun", "netavark", "Podman"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: apt-repo
+  cancel-in-progress: false
+
+jobs:
+  generate-repo:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev gzip gnupg
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ap-southeast-2
+          role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload
+          role-session-name: GHA@3PB=apt-repo
+
+      - name: Download all .deb files from S3
+        run: |
+          mkdir -p repo/pool
+
+          # Download all deb files to pool directory
+          aws s3 sync s3://bes-ops-tools/crun/ repo/pool/crun/ --exclude "*" --include "*.deb" --no-progress
+          aws s3 sync s3://bes-ops-tools/podman/ repo/pool/podman/ --no-progress --exclude "*" --include "*.deb"
+          aws s3 sync s3://bes-ops-tools/netavark/ repo/pool/netavark/ --no-progress --exclude "*" --include "*.deb"
+
+          # Flatten pool structure (optional, keeps version structure)
+          find repo/pool -name "*.deb" -type f
+
+      - name: Generate repository metadata for amd64
+        run: |
+          mkdir -p repo/dists/stable/main/binary-amd64
+          cd repo
+
+          # Scan packages for amd64
+          dpkg-scanpackages --arch amd64 pool /dev/null | gzip -9c > dists/stable/main/binary-amd64/Packages.gz
+          dpkg-scanpackages --arch amd64 pool /dev/null > dists/stable/main/binary-amd64/Packages
+
+          cd ..
+
+      - name: Generate repository metadata for arm64
+        run: |
+          mkdir -p repo/dists/stable/main/binary-arm64
+          cd repo
+
+          # Scan packages for arm64
+          dpkg-scanpackages --arch arm64 pool /dev/null | gzip -9c > dists/stable/main/binary-arm64/Packages.gz
+          dpkg-scanpackages --arch arm64 pool /dev/null > dists/stable/main/binary-arm64/Packages
+
+          cd ..
+
+      - name: Generate Release file
+        run: |
+          cd repo/dists/stable
+
+          cat > Release <<EOF
+          Origin: BES Third Party Builds
+          Label: BES Third Party Builds
+          Suite: stable
+          Codename: stable
+          Architectures: amd64 arm64
+          Components: main
+          Description: BES custom APT repository for third-party builds
+          Date: $(date -Ru)
+          EOF
+
+          # Generate checksums
+          echo "MD5Sum:" >> Release
+          find main -type f | while read file; do
+            md5sum "$file" | awk '{print " " $1, "'$(stat -c%s "$file")'", "'"$file"'"}' >> Release
+          done
+
+          echo "SHA1:" >> Release
+          find main -type f | while read file; do
+            sha1sum "$file" | awk '{print " " $1, "'$(stat -c%s "$file")'", "'"$file"'"}' >> Release
+          done
+
+          echo "SHA256:" >> Release
+          find main -type f | while read file; do
+            sha256sum "$file" | awk '{print " " $1, "'$(stat -c%s "$file")'", "'"$file"'"}' >> Release
+          done
+
+          cd ../../..
+
+      - name: Upload repository to S3
+        run: |
+          # Upload the entire repo structure to /apt/
+          aws s3 sync repo/ s3://bes-ops-tools/apt/ --delete --no-progress
+
+          # Set proper content types
+          aws s3 cp s3://bes-ops-tools/apt/ s3://bes-ops-tools/apt/ \
+            --exclude "*" \
+            --include "*.deb" \
+            --recursive \
+            --no-guess-mime-type \
+            --content-type "application/vnd.debian.binary-package" \
+            --metadata-directive REPLACE \
+            --no-progress
+
+          aws s3 cp s3://bes-ops-tools/apt/ s3://bes-ops-tools/apt/ \
+            --exclude "*" \
+            --include "Packages*" \
+            --recursive \
+            --no-guess-mime-type \
+            --content-type "text/plain" \
+            --metadata-directive REPLACE \
+            --no-progress
+
+          aws s3 cp s3://bes-ops-tools/apt/ s3://bes-ops-tools/apt/ \
+            --exclude "*" \
+            --include "Release*" \
+            --recursive \
+            --no-guess-mime-type \
+            --content-type "text/plain" \
+            --metadata-directive REPLACE \
+            --no-progress
+
+      - name: Clear CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id=EDAG0UBS1MN74 \
+            --paths '/apt/*'
+
+      - name: Summary
+        run: |
+          echo "## APT Repository Updated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Repository URL: https://tools.ops.tamanu.io/apt" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Packages:" >> $GITHUB_STEP_SUMMARY
+          find repo/pool -name "*.deb" -type f | sort | while read deb; do
+            echo "- $(basename $deb)" >> $GITHUB_STEP_SUMMARY
+          done

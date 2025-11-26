@@ -38,6 +38,18 @@ These builds are expressely for BES' purposes, and no guarantees are made beyond
 
 Notably, builds may disappear or change at any moment without notice.
 
+## APT Repository
+
+We provide a custom APT repository for Debian packages built in this project.
+
+### Adding the Repository
+
+```bash
+echo "deb [trusted=yes] https://tools.ops.tamanu.io/apt stable main" | sudo tee /etc/apt/sources.list.d/bes-third-party.list
+sudo apt-get update
+sudo apt-get install podman crun netavark
+```
+
 ## Builds
 
 ### [Caddy](./.github/workflows/caddy.yml)
@@ -58,6 +70,7 @@ https://tools.ops.tamanu.io/caddy/latest/caddy-{target}
 - Upstream: <https://github.com/containers/crun>
 - Targets: Linux (x64 and ARM64)
 - Package: tar.zst and .deb
+- APT: Available in repository
 
 Reason: .deb packaging for a version compatible with Podman 5.
 
@@ -71,6 +84,7 @@ https://tools.ops.tamanu.io/crun/{version}/crun-{target}-{version}.deb
 - Upstream: <https://github.com/containers/podman>
 - Targets: Linux (x64 and ARM64)
 - Package: tar.zst and .deb
+- APT: Available in repository
 
 Reason: upstream doesn't provide builds.
 
@@ -84,6 +98,7 @@ https://tools.ops.tamanu.io/podman/{version}/podman-{target}-{version}.deb
 - Upstream: <https://github.com/containers/netavark>
 - Targets: Linux (x64 and ARM64)
 - Package: tar.zst and .deb
+- APT: Available in repository
 
 Reason: .deb packaging for a version compatible with Podman 5.
 

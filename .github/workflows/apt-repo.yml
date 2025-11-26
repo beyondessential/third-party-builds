@@ -46,28 +46,27 @@ jobs:
 
       - name: Download all .deb files from S3
         run: |
+          mkdir -p repo/pool
           for archs in amd64.x86_64 arm64.aarch64
           do
             arch=$(cut -d. -f1 <<< "$archs")
             target=$(cut -d. -f2 <<< "$archs")
-            mkdir -p $arch/repo/pool
             for dir in crun podman netavark caddy bestool; do
-              aws s3 sync s3://bes-ops-tools/$dir/ $arch/repo/pool/$dir/ --no-progress --exclude "*" --include "*-$arch-*.deb"
+              aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-$arch-*.deb"
             done
             find $arch/repo/pool -name "*.deb" -type f
           done
 
       - name: Generate repository metadata
         run: |
+          cd repo
           for arch in amd64 arm64
           do
-            pushd $arch/repo
             mkdir -p dists/stable/main/binary-$arch
-            dpkg-scanpackages --multiversion pool /dev/null > dists/stable/main/binary-$arch/Packages
+            dpkg-scanpackages --multiversion pool/$arch /dev/null > dists/stable/main/binary-$arch/Packages
             gzip --keep --best dists/stable/main/binary-$arch/Packages
             bzip2 --keep --best dists/stable/main/binary-$arch/Packages
             xz --keep -6e dists/stable/main/binary-$arch/Packages
-            popd
           done
 
       - name: Generate Release file

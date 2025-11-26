@@ -113,16 +113,3 @@ Reason: .deb packaging for a version compatible with Podman 5.
 https://tools.ops.tamanu.io/netavark/{version}/netavark-{target}-{version}.tar.zst
 https://tools.ops.tamanu.io/netavark/{version}/netavark-{target}-{version}.deb
 ```
-
-### [OpenTelemetry Collector](./.github/workflows/otelcol.yml)
-
-- Upstream: <https://opentelemetry.io/docs/collector/>
-- Targets: Linux (x64 and ARM64), Windows, macOS (Intel and ARM64)
-- Package: none (raw executable)
-
-Reason: we need file storage for our collector, and the AWS auth extension.
-
-```
-https://tools.ops.tamanu.io/otelcol/{version}/otelcol-{target}-{version}
-https://tools.ops.tamanu.io/otelcol/{version}/otelcol-{target}-{version}.exe
-```

@@ -65,7 +65,7 @@ jobs:
           for arch in amd64 arm64
           do
             mkdir -p dists/stable/main/binary-$arch
-            dpkg-scanpackages --multiversion pool/$arch /dev/null > dists/stable/main/binary-$arch/Packages
+            dpkg-scanpackages --multiversion pool/$arch /dev/null | tee dists/stable/main/binary-$arch/Packages
             gzip --keep --best dists/stable/main/binary-$arch/Packages
             bzip2 --keep --best dists/stable/main/binary-$arch/Packages
             xz --keep -6e dists/stable/main/binary-$arch/Packages

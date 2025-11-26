@@ -65,7 +65,7 @@ jobs:
       - shell: bash
         run: |
           xcaddy build v${{ env.CADDY_VERSION }} \
-            --with github.com/caddy-dns/route53@v1.6.0-beta.2 \
+            --with github.com/caddy-dns/route53@v1.6.0 \
             --with github.com/mholt/caddy-ratelimit \
             --with github.com/mholt/caddy-l4 \
             --with github.com/corazawaf/coraza-caddy/v2

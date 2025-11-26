@@ -3,7 +3,7 @@ name: APT Repository
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 */12 * * *`" # Twice a day
+    - cron: "0 */12 * * *" # Twice a day
   workflow_run:
     workflows: ["crun", "netavark", "podman", "caddy"]
     types: [completed]

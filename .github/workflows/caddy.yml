@@ -26,16 +26,12 @@ jobs:
     strategy:
       matrix:
         include:
-          # the os and targets look upside down, but aren't:
-          # we want to force xcaddy to cross compile, as a
-          # workaround for a bug in xcaddy that causes it to
-          # fail when it builds on the native target
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-24.04
             name: x86_64-unknown-linux-gnu
             goos: linux
             goarch: amd64
             debarch: amd64
-          - os: ubuntu-24.04
+          - os: ubuntu-24.04-arm
             name: aarch64-unknown-linux-gnu
             goos: linux
             goarch: arm64
@@ -76,7 +72,6 @@ jobs:
         run: |
           ext=""
           [[ "${{ runner.os }}" == windows* ]] && ext=".exe"
-          stat caddy$ext
           mv caddy$ext caddy-${{ matrix.name }}$ext
 
       - name: Make deb (Linux only)
@@ -85,27 +80,22 @@ jobs:
         run: |
           set -x
 
-          mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/usr/bin
-          mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/config
-          mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/snippets
           mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/servers
-          mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/lib/systemd/system
           mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/var/lib/caddy
           mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN
 
           # Install binary
-          cp caddy-${{ matrix.name }} caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/usr/bin/caddy
-          chmod 755 caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/usr/bin/caddy
+          install -Dm755 caddy-${{ matrix.name }} caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/usr/bin/caddy
 
           # Install systemd units
-          cp caddy/caddy.service caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/lib/systemd/system/
-          cp caddy/caddy.socket caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/lib/systemd/system/
+          install -Dm644 caddy-files/caddy.service caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/lib/systemd/system/caddy.service
+          install -Dm644 caddy-files/caddy.socket caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/lib/systemd/system/caddy.socket
 
           # Install config files
-          cp caddy/Caddyfile caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/
-          cp caddy/config/issuer caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/config/
-          cp caddy/config/waf caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/config/
-          cp caddy/snippets/waf caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/snippets/
+          install -Dm644 caddy-files/Caddyfile caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/
+          install -Dm644 caddy-files/config/issuer caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/config/
+          install -Dm644 caddy-files/config/waf caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/config/
+          install -Dm644 caddy-files/snippets/waf caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/snippets/
 
           # Create control file
           cat > caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/control <<EOF

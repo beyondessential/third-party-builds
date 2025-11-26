@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - .github/workflows/caddy.yml
+      - caddy/**
 
 permissions:
   id-token: write
@@ -29,10 +30,26 @@ jobs:
             name: x86_64-unknown-linux-gnu
             goos: linux
             goarch: amd64
+            debarch: amd64
+            glibc: 2.38
+          - os: ubuntu-22.04
+            name: x86_64-unknown-linux-gnu35
+            goos: linux
+            goarch: amd64
+            debarch: amd64
+            glibc: 2.35
           - os: ubuntu-24.04-arm
             name: aarch64-unknown-linux-gnu
             goos: linux
             goarch: arm64
+            debarch: arm64
+            glibc: 2.38
+          - os: ubuntu-22.04-arm
+            name: aarch64-unknown-linux-gnu35
+            goos: linux
+            goarch: arm64
+            debarch: arm64
+            glibc: 2.35
           - os: windows-latest
             name: x86_64-pc-windows-gnu
             goos: windows
@@ -48,6 +65,8 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -69,7 +88,113 @@ jobs:
           [[ "${{ runner.os }}" == windows* ]] && ext=".exe"
           mv caddy$ext caddy-${{ matrix.name }}$ext
 
+      - name: Make deb (Linux only)
+        if: matrix.goos == 'linux'
+        shell: bash
+        run: |
+          mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/usr/bin
+          mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/config
+          mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/snippets
+          mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/servers
+          mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/lib/systemd/system
+          mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/var/lib/caddy
+          mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN
+
+          # Install binary
+          cp caddy-${{ matrix.name }} caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/usr/bin/caddy
+          chmod 755 caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/usr/bin/caddy
+
+          # Install systemd units
+          cp caddy/caddy.service caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/lib/systemd/system/
+          cp caddy/caddy.socket caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/lib/systemd/system/
+
+          # Install config files
+          cp caddy/Caddyfile caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/
+          cp caddy/config/issuer caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/config/
+          cp caddy/config/waf caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/config/
+          cp caddy/snippets/waf caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/snippets/
+
+          # Create control file
+          cat > caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/control <<EOF
+          Package: caddy
+          Version: ${{ env.CADDY_VERSION }}
+          Architecture: ${{ matrix.debarch }}
+          Priority: optional
+          Section: net
+          Maintainer: BES <support@bes.au>
+          Depends: libc6 (>= ${{ matrix.glibc }})
+          Homepage: https://caddyserver.com
+          Description: Fast and extensible multi-platform HTTP/1-2-3 web server with automatic HTTPS
+           Caddy is a powerful, enterprise-ready, open source web server with automatic
+           HTTPS written in Go. This build includes Route53 DNS, Azure DNS, rate limiting,
+           and layer 4 proxy plugins.
+          EOF
+
+          # Create conffiles (mark config files as conffiles so they won't be overwritten)
+          cat > caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/conffiles <<EOF
+          /etc/caddy/Caddyfile
+          /etc/caddy/config/issuer
+          /etc/caddy/config/waf
+          /etc/caddy/snippets/waf
+          EOF
+
+          # Create postinst script to create user/group
+          cat > caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/postinst <<'EOF'
+          #!/bin/sh
+          set -e
+
+          # Create caddy user and group if they don't exist
+          if ! getent group caddy >/dev/null; then
+              groupadd --system caddy
+          fi
+
+          if ! getent passwd caddy >/dev/null; then
+              useradd --system --gid caddy --home-dir /var/lib/caddy --no-create-home --shell /usr/sbin/nologin caddy
+          fi
+
+          # Set ownership
+          chown -R caddy:caddy /var/lib/caddy
+
+          # Reload systemd
+          if [ -d /run/systemd/system ]; then
+              systemctl daemon-reload >/dev/null 2>&1 || true
+          fi
+
+          #DEBHELPER#
+          EOF
+
+          chmod 755 caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/postinst
+
+          # Create postrm script to clean up user/group on purge
+          cat > caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/postrm <<'EOF'
+          #!/bin/sh
+          set -e
+
+          if [ "$1" = "purge" ]; then
+              # Remove user and group
+              if getent passwd caddy >/dev/null; then
+                  userdel caddy >/dev/null 2>&1 || true
+              fi
+
+              if getent group caddy >/dev/null; then
+                  groupdel caddy >/dev/null 2>&1 || true
+              fi
+          fi
+
+          #DEBHELPER#
+          EOF
+
+          chmod 755 caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/postrm
+
+          # Build deb package
+          dpkg-deb --root-owner-group -b caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}
+
       - uses: actions/attest-build-provenance@v1
+        if: matrix.goos == 'linux'
+        with:
+          subject-path: caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}.*
+      - uses: actions/attest-build-provenance@v1
+        if: matrix.goos != 'linux'
         with:
           subject-path: caddy-${{ matrix.name }}*
       - uses: actions/upload-artifact@v4
@@ -100,6 +225,8 @@ jobs:
       - name: Upload
         run: |
           for f in caddy-*; do
+            # Skip directories (the deb build directories)
+            [ -d "$f" ] && continue
             aws s3 cp $f s3://bes-ops-tools/caddy/${{ env.CADDY_VERSION }}/$f --no-progress
             aws s3 cp $f s3://bes-ops-tools/caddy/latest/$f --no-progress
           done

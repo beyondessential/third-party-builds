@@ -1,0 +1,15 @@
+(waf) {
+  coraza_waf {
+    load_owasp_crs
+    directives `
+      Include @coraza.conf-recommended
+      Include @crs-setup.conf.example
+      Include @owasp_crs/*.conf
+
+      SecRuleEngine On
+
+      SecRequestBodyLimit 104857600
+      SecResponseBodyMimeType text/plain text/html text/xml application/json
+    `
+  }
+}

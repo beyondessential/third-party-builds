@@ -1,0 +1,34 @@
+{
+  default_bind fd/4 {
+    protocols h1 h2
+  }
+
+  default_bind fdgram/5 {
+    protocols h3
+  }
+
+  admin localhost:2019
+
+  # with socket activation, caddy attempts to redirect to port 0
+  # which obviously doesn't work. instead we redir manually.
+  auto_https disable_redirects
+
+  storage file_system {
+    root /var/lib/caddy
+  }
+
+  log {
+    output stdout
+  }
+
+  import /etc/caddy/config/*
+}
+
+(bind80) {
+  bind fd/3 {
+    protocols h1
+  }
+}
+
+import /etc/caddy/snippets/*
+import /etc/caddy/servers/*

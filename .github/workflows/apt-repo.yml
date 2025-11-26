@@ -3,7 +3,7 @@ name: APT Repository
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: ["crun", "netavark", "podman"]
+    workflows: ["crun", "netavark", "Podman", "Caddy"]
     types: [completed]
     branches: [main]
 
@@ -43,6 +43,7 @@ jobs:
           aws s3 sync s3://bes-ops-tools/crun/ repo/pool/crun/ --exclude "*" --include "*.deb" --no-progress
           aws s3 sync s3://bes-ops-tools/podman/ repo/pool/podman/ --no-progress --exclude "*" --include "*.deb"
           aws s3 sync s3://bes-ops-tools/netavark/ repo/pool/netavark/ --no-progress --exclude "*" --include "*.deb"
+          aws s3 sync s3://bes-ops-tools/caddy/ repo/pool/caddy/ --no-progress --exclude "*" --include "*.deb"
           find repo/pool -name "*.deb" -type f
 
       - name: Generate repository metadata for amd64

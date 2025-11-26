@@ -52,7 +52,7 @@ Pin-Priority: 999
 EOF
 
 sudo apt-get update
-sudo apt-get install podman crun netavark
+sudo apt-get install caddy podman crun netavark
 ```
 
 ## Builds
@@ -61,12 +61,14 @@ sudo apt-get install podman crun netavark
 
 - Upstream: <https://caddyserver.com>
 - Targets: Linux (x64 and ARM64), Windows, macOS (Intel and ARM64)
-- Package: none (raw executable)
+- Package: .deb (Linux only), raw executable (all platforms)
+- APT: Available in repository
 
 Reason: includes the [Route53 DNS](https://github.com/caddy-dns/route53) and other plugins.
 
 ```
 https://tools.ops.tamanu.io/caddy/{version}/caddy-{target}
+https://tools.ops.tamanu.io/caddy/{version}/caddy-{target}-{version}.deb
 https://tools.ops.tamanu.io/caddy/latest/caddy-{target}
 ```
 

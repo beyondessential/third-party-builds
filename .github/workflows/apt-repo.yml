@@ -53,7 +53,7 @@ jobs:
             target=$(cut -d. -f2 <<< "$archs")
             for dir in crun podman netavark caddy bestool; do
               mkdir -p repo/pool/$arch/$dir
-              aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-$arch-*.deb"
+              aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-$target-*.deb"
             done
             find $arch/repo/pool -name "*.deb" -type f
           done

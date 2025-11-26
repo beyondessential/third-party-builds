@@ -108,6 +108,7 @@ jobs:
           Depends: libc6 (>= 2.34), libzstd1 (>= 1.5.5), libnss3-tools, media-types
           Homepage: https://caddyserver.com
           Description: Fast, lightweight web server with automatic HTTPS. BES version
+          EOF
 
           # Create conffiles (mark config files as conffiles so they won't be overwritten)
           cat > caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/conffiles <<EOF

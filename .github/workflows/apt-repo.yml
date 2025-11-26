@@ -3,7 +3,7 @@ name: APT Repository
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: ["crun", "netavark", "Podman"]
+    workflows: ["crun", "netavark", "podman"]
     types: [completed]
     branches: [main]
 
@@ -25,6 +25,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y dpkg-dev gzip gnupg
 
+      - name: Import GPG key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          gpg --list-secret-keys
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -35,49 +40,37 @@ jobs:
       - name: Download all .deb files from S3
         run: |
           mkdir -p repo/pool
-
-          # Download all deb files to pool directory
           aws s3 sync s3://bes-ops-tools/crun/ repo/pool/crun/ --exclude "*" --include "*.deb" --no-progress
           aws s3 sync s3://bes-ops-tools/podman/ repo/pool/podman/ --no-progress --exclude "*" --include "*.deb"
           aws s3 sync s3://bes-ops-tools/netavark/ repo/pool/netavark/ --no-progress --exclude "*" --include "*.deb"
-
-          # Flatten pool structure (optional, keeps version structure)
           find repo/pool -name "*.deb" -type f
 
       - name: Generate repository metadata for amd64
         run: |
           mkdir -p repo/dists/stable/main/binary-amd64
           cd repo
-
-          # Scan packages for amd64
           dpkg-scanpackages --arch amd64 pool /dev/null | gzip -9c > dists/stable/main/binary-amd64/Packages.gz
           dpkg-scanpackages --arch amd64 pool /dev/null > dists/stable/main/binary-amd64/Packages
-
-          cd ..
 
       - name: Generate repository metadata for arm64
         run: |
           mkdir -p repo/dists/stable/main/binary-arm64
           cd repo
-
-          # Scan packages for arm64
           dpkg-scanpackages --arch arm64 pool /dev/null | gzip -9c > dists/stable/main/binary-arm64/Packages.gz
           dpkg-scanpackages --arch arm64 pool /dev/null > dists/stable/main/binary-arm64/Packages
-
-          cd ..
 
       - name: Generate Release file
         run: |
           cd repo/dists/stable
 
           cat > Release <<EOF
-          Origin: BES Third Party Builds
-          Label: BES Third Party Builds
+          Origin: BES Tools
+          Label: BES Tools
           Suite: stable
           Codename: stable
           Architectures: amd64 arm64
           Components: main
-          Description: BES custom APT repository for third-party builds
+          Description: Tools and runtimes for BES deployments
           Date: $(date -Ru)
           EOF
 
@@ -97,14 +90,19 @@ jobs:
             sha256sum "$file" | awk '{print " " $1, "'$(stat -c%s "$file")'", "'"$file"'"}' >> Release
           done
 
-          cd ../../..
+      - name: Sign Release
+        run: |
+          cd repo/dists/stable
+          gpg --export --armor ${{ vars.GPG_KEY_ID }} > ../../bes-tools.gpg.key
+          gpg --batch --yes --no-tty --pinentry-mode loopback --default-key ${{ vars.GPG_KEY_ID }} -abs -o Release.gpg Release
+          gpg --batch --yes --no-tty --pinentry-mode loopback --default-key ${{ vars.GPG_KEY_ID }} --clearsign -o InRelease Release
 
       - name: Upload repository to S3
         run: |
-          # Upload the entire repo structure to /apt/
           aws s3 sync repo/ s3://bes-ops-tools/apt/ --delete --no-progress
 
           # Set proper content types
+
           aws s3 cp s3://bes-ops-tools/apt/ s3://bes-ops-tools/apt/ \
             --exclude "*" \
             --include "*.deb" \
@@ -137,14 +135,3 @@ jobs:
           aws cloudfront create-invalidation \
             --distribution-id=EDAG0UBS1MN74 \
             --paths '/apt/*'
-
-      - name: Summary
-        run: |
-          echo "## APT Repository Updated" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Repository URL: https://tools.ops.tamanu.io/apt" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Packages:" >> $GITHUB_STEP_SUMMARY
-          find repo/pool -name "*.deb" -type f | sort | while read deb; do
-            echo "- $(basename $deb)" >> $GITHUB_STEP_SUMMARY
-          done

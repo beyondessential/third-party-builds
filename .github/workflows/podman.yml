@@ -1,4 +1,4 @@
-name: Podman
+name: podman
 
 on:
   workflow_dispatch:

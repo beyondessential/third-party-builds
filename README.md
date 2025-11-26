@@ -38,14 +38,19 @@ These builds are expressely for BES' purposes, and no guarantees are made beyond
 
 Notably, builds may disappear or change at any moment without notice.
 
-## APT Repository
+### APT repository
 
-We provide a custom APT repository for Debian packages built in this project.
-
-### Adding the Repository
+We provide a custom APT repository for our tools, including these.
 
 ```bash
-echo "deb [trusted=yes] https://tools.ops.tamanu.io/apt stable main" | sudo tee /etc/apt/sources.list.d/bes-third-party.list
+curl -fsSL https://tools.ops.tamanu.io/apt/bes-tools.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/bes-tools.gpg
+echo "deb [signed-by=/etc/apt/keyrings/bes-tools.gpg] https://tools.ops.tamanu.io/apt stable main" | sudo tee /etc/apt/sources.list.d/bes-tools.list
+sudo tee /etc/apt/preferences.d/bes-tools <<EOF
+Package: *
+Pin: origin tools.ops.tamanu.io
+Pin-Priority: 999
+EOF
+
 sudo apt-get update
 sudo apt-get install podman crun netavark
 ```

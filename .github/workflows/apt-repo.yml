@@ -163,11 +163,11 @@ jobs:
 
       - name: Add APT repository
         run: |
-          curl -fsSL https://tools.ops.tamanu.app/apt/bes-tools.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/bes-tools.gpg
-          echo "deb [signed-by=/etc/apt/keyrings/bes-tools.gpg] https://tools.ops.tamanu.app/apt stable main" | sudo tee /etc/apt/sources.list.d/bes-tools.list
+          curl -fsSL https://tools.ops.tamanu.io/apt/bes-tools.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/bes-tools.gpg
+          echo "deb [signed-by=/etc/apt/keyrings/bes-tools.gpg] https://tools.ops.tamanu.io/apt stable main" | sudo tee /etc/apt/sources.list.d/bes-tools.list
           sudo tee /etc/apt/preferences.d/bes-tools <<EOF
           Package: *
-          Pin: origin tools.ops.tamanu.app
+          Pin: origin tools.ops.tamanu.io
           Pin-Priority: 999
           EOF
           sudo apt-get update

@@ -7,7 +7,7 @@ This repository contains GitHub Actions workflows that build third-party softwar
 Builds are pushed to a CDN, with a scheme that roughly always goes:
 
 ```
-https://tools.ops.tamanu.app/{name}/{version}/{name}-{target}.{extension}
+https://tools.ops.tamanu.io/{name}/{version}/{name}-{target}.{extension}
 ```
 
 Some builds have a `latest` URL to always obtain the latest version.
@@ -43,11 +43,11 @@ Notably, builds may disappear or change at any moment without notice.
 We provide a custom APT repository for our tools, including these.
 
 ```bash
-curl -fsSL https://tools.ops.tamanu.app/apt/bes-tools.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/bes-tools.gpg
-echo "deb [signed-by=/etc/apt/keyrings/bes-tools.gpg] https://tools.ops.tamanu.app/apt stable main" | sudo tee /etc/apt/sources.list.d/bes-tools.list
+curl -fsSL https://tools.ops.tamanu.io/apt/bes-tools.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/bes-tools.gpg
+echo "deb [signed-by=/etc/apt/keyrings/bes-tools.gpg] https://tools.ops.tamanu.io/apt stable main" | sudo tee /etc/apt/sources.list.d/bes-tools.list
 sudo tee /etc/apt/preferences.d/bes-tools <<EOF
 Package: *
-Pin: origin tools.ops.tamanu.app
+Pin: origin tools.ops.tamanu.io
 Pin-Priority: 999
 EOF
 
@@ -67,9 +67,9 @@ sudo apt-get install caddy podman crun netavark
 Reason: includes the [Route53 DNS](https://github.com/caddy-dns/route53) and other plugins.
 
 ```
-https://tools.ops.tamanu.app/caddy/{version}/caddy-{target}
-https://tools.ops.tamanu.app/caddy/{version}/caddy-{target}-{version}.deb
-https://tools.ops.tamanu.app/caddy/latest/caddy-{target}
+https://tools.ops.tamanu.io/caddy/{version}/caddy-{target}
+https://tools.ops.tamanu.io/caddy/{version}/caddy-{target}-{version}.deb
+https://tools.ops.tamanu.io/caddy/latest/caddy-{target}
 ```
 
 ### [crun](./.github/workflows/crun.yml)
@@ -82,8 +82,8 @@ https://tools.ops.tamanu.app/caddy/latest/caddy-{target}
 Reason: .deb packaging for a version compatible with Podman 5.
 
 ```
-https://tools.ops.tamanu.app/crun/{version}/crun-{target}-{version}.tar.zst
-https://tools.ops.tamanu.app/crun/{version}/crun-{target}-{version}.deb
+https://tools.ops.tamanu.io/crun/{version}/crun-{target}-{version}.tar.zst
+https://tools.ops.tamanu.io/crun/{version}/crun-{target}-{version}.deb
 ```
 
 ### [Podman](./.github/workflows/podman.yml)
@@ -96,8 +96,8 @@ https://tools.ops.tamanu.app/crun/{version}/crun-{target}-{version}.deb
 Reason: upstream doesn't provide builds.
 
 ```
-https://tools.ops.tamanu.app/podman/{version}/podman-{target}-{version}.tar.zst
-https://tools.ops.tamanu.app/podman/{version}/podman-{target}-{version}.deb
+https://tools.ops.tamanu.io/podman/{version}/podman-{target}-{version}.tar.zst
+https://tools.ops.tamanu.io/podman/{version}/podman-{target}-{version}.deb
 ```
 
 ### [Netavark](./.github/workflows/netavark.yml)
@@ -110,6 +110,6 @@ https://tools.ops.tamanu.app/podman/{version}/podman-{target}-{version}.deb
 Reason: .deb packaging for a version compatible with Podman 5.
 
 ```
-https://tools.ops.tamanu.app/netavark/{version}/netavark-{target}-{version}.tar.zst
-https://tools.ops.tamanu.app/netavark/{version}/netavark-{target}-{version}.deb
+https://tools.ops.tamanu.io/netavark/{version}/netavark-{target}-{version}.tar.zst
+https://tools.ops.tamanu.io/netavark/{version}/netavark-{target}-{version}.deb
 ```

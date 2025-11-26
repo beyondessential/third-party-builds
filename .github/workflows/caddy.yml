@@ -92,10 +92,10 @@ jobs:
           install -Dm644 caddy-files/caddy.socket caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/lib/systemd/system/caddy.socket
 
           # Install config files
-          install -Dm644 caddy-files/Caddyfile caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/
-          install -Dm644 caddy-files/config/issuer caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/config/
-          install -Dm644 caddy-files/config/waf caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/config/
-          install -Dm644 caddy-files/snippets/waf caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/snippets/
+          install -Dm644 caddy-files/Caddyfile caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/Caddyfile
+          install -Dm644 caddy-files/config/issuer caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/config/issuer
+          install -Dm644 caddy-files/config/waf caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/config/waf
+          install -Dm644 caddy-files/snippets/waf caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/snippets/waf
 
           # Create control file
           cat > caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/control <<EOF

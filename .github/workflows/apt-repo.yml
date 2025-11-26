@@ -8,6 +8,11 @@ on:
     workflows: ["crun", "netavark", "podman", "caddy"]
     types: [completed]
     branches: [main]
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/apt-repo.yml
 
 permissions:
   id-token: write

@@ -55,8 +55,8 @@ jobs:
               mkdir -p repo/pool/$arch/$dir
               aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-$target-*.deb"
             done
-            find $arch/repo/pool -name "*.deb" -type f
           done
+          find repo/pool -name "*.deb" -type f
 
       - name: Generate repository metadata
         run: |

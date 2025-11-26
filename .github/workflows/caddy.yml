@@ -31,25 +31,11 @@ jobs:
             goos: linux
             goarch: amd64
             debarch: amd64
-            glibc: 2.38
-          - os: ubuntu-22.04
-            name: x86_64-unknown-linux-gnu35
-            goos: linux
-            goarch: amd64
-            debarch: amd64
-            glibc: 2.35
           - os: ubuntu-24.04-arm
             name: aarch64-unknown-linux-gnu
             goos: linux
             goarch: arm64
             debarch: arm64
-            glibc: 2.38
-          - os: ubuntu-22.04-arm
-            name: aarch64-unknown-linux-gnu35
-            goos: linux
-            goarch: arm64
-            debarch: arm64
-            glibc: 2.35
           - os: windows-latest
             name: x86_64-pc-windows-gnu
             goos: windows
@@ -122,13 +108,9 @@ jobs:
           Priority: optional
           Section: net
           Maintainer: BES <support@bes.au>
-          Depends: libc6 (>= ${{ matrix.glibc }})
+          Depends: libc6 (>= 2.34), libzstd1 (>= 1.5.5), libnss3-tools, media-types
           Homepage: https://caddyserver.com
-          Description: Fast and extensible multi-platform HTTP/1-2-3 web server with automatic HTTPS
-           Caddy is a powerful, enterprise-ready, open source web server with automatic
-           HTTPS written in Go. This build includes Route53 DNS, Azure DNS, rate limiting,
-           and layer 4 proxy plugins.
-          EOF
+          Description: Fast, lightweight web server with automatic HTTPS. BES version
 
           # Create conffiles (mark config files as conffiles so they won't be overwritten)
           cat > caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/conffiles <<EOF

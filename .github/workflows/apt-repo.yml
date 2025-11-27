@@ -174,7 +174,7 @@ jobs:
 
       - name: Install packages from repository
         run: |
-          sudo apt-get install -y caddy crun netavark podman
+          sudo apt-get install -y caddy crun netavark podman bestool bestool-{psql,alertd} algae
 
       - name: Verify installations
         run: |
@@ -183,6 +183,10 @@ jobs:
           crun --version
           /usr/local/libexec/podman/netavark --version
           podman --version
+          bestool --version
+          bestool-psql -h
+          bestool-alertd -h
+          algae --version
 
       - name: Check systemd units (caddy)
         run: |

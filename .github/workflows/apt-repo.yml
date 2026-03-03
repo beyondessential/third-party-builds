@@ -5,7 +5,7 @@ on:
   schedule:
     - cron: "0 */12 * * *" # Twice a day
   workflow_run:
-    workflows: ["crun", "netavark", "podman", "caddy"]
+    workflows: ["aardvark-dns", "crun", "netavark", "podman", "caddy"]
     types: [completed]
     branches: [main]
   push:
@@ -51,7 +51,7 @@ jobs:
           do
             arch=$(cut -d. -f1 <<< "$archs")
             target=$(cut -d. -f2 <<< "$archs")
-            for dir in crun podman netavark caddy bestool; do
+            for dir in aardvark-dns crun podman netavark caddy bestool; do
               mkdir -p repo/pool/$arch/$dir
               aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-$target-*.deb"
             done
@@ -174,11 +174,12 @@ jobs:
 
       - name: Install packages from repository
         run: |
-          sudo apt-get install -y caddy crun netavark podman bestool bestool-{psql,alertd} algae
+          sudo apt-get install -y aardvark-dns caddy crun netavark podman bestool bestool-{psql,alertd} algae
 
       - name: Verify installations
         run: |
           set -x
+          /usr/local/libexec/podman/aardvark-dns --version
           caddy version
           crun --version
           /usr/local/libexec/podman/netavark --version

@@ -52,10 +52,24 @@ Pin-Priority: 999
 EOF
 
 sudo apt-get update
-sudo apt-get install caddy podman crun netavark
+sudo apt-get install aardvark-dns caddy podman crun netavark
 ```
 
 ## Builds
+
+### [Aardvark DNS](./.github/workflows/aardvark-dns.yml)
+
+- Upstream: <https://github.com/containers/aardvark-dns>
+- Targets: Linux (x64 and ARM64)
+- Package: tar.zst and .deb
+- APT: Available in repository
+
+Reason: .deb packaging for a newer version (Ubuntu 24.04 ships with 1.4.0) with performance fixes.
+
+```
+https://tools.ops.tamanu.io/aardvark-dns/{version}/aardvark-dns-{target}-{version}.tar.zst
+https://tools.ops.tamanu.io/aardvark-dns/{version}/aardvark-dns-{target}-{version}.deb
+```
 
 ### [Caddy](./.github/workflows/caddy.yml)
 

@@ -1,0 +1,117 @@
+name: aardvark-dns
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/aardvark-dns.yml
+
+permissions:
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  AARDVARK_DNS_VERSION: 1.17.0
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            name: x86_64-unknown-linux-gnu
+            debarch: amd64
+            glibc: 2.38
+          - os: ubuntu-22.04
+            name: x86_64-unknown-linux-gnu35
+            debarch: amd64
+            glibc: 2.35
+          - os: ubuntu-24.04-arm
+            name: aarch64-unknown-linux-gnu
+            debarch: arm64
+            glibc: 2.38
+          - os: ubuntu-22.04-arm
+            name: aarch64-unknown-linux-gnu35
+            debarch: arm64
+            glibc: 2.35
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout aardvark-dns source
+        uses: actions/checkout@v4
+        with:
+          repository: containers/aardvark-dns
+          ref: v${{ env.AARDVARK_DNS_VERSION }}
+      - run: rustup toolchain install stable --profile minimal
+      - uses: Swatinem/rust-cache@v2
+
+      - run: make
+      - run: mkdir aardvark-dns-${{ matrix.name }}-${{ env.AARDVARK_DNS_VERSION }}
+      - run: make DESTDIR=$(pwd)/aardvark-dns-${{ matrix.name }}-${{ env.AARDVARK_DNS_VERSION }} install
+      - run: tar -caf aardvark-dns-${{ matrix.name }}-${{ env.AARDVARK_DNS_VERSION }}.tar.zst aardvark-dns-${{ matrix.name }}-${{ env.AARDVARK_DNS_VERSION }}
+
+      - name: Make deb
+        run: |
+          mkdir -p aardvark-dns-${{ matrix.name }}-${{ env.AARDVARK_DNS_VERSION }}/DEBIAN
+          cat <<EOF > aardvark-dns-${{ matrix.name }}-${{ env.AARDVARK_DNS_VERSION }}/DEBIAN/control
+          Package: aardvark-dns
+          Version: ${{ env.AARDVARK_DNS_VERSION }}
+          Architecture: ${{ matrix.debarch }}
+          Priority: optional
+          Section: universe/net
+          Maintainer: BES <support@bes.au>
+          Original-Maintainer: Reinhard Tartler <siretart@tauware.de>
+          Bugs: https://github.com/containers/aardvark-dns/issues
+          Depends: libc6 (>= ${{ matrix.glibc }}), libgcc-s1 (>= 4.2)
+          Enhances: netavark, podman
+          Homepage: https://github.com/containers/aardvark-dns
+          Description: Authoritative DNS server for A/AAAA container records
+           Aardvark-dns is an authoritative DNS server for A/AAAA container
+           records. It is used by Netavark to provide DNS resolution between
+           containers on a Podman network.
+          EOF
+          dpkg-deb --root-owner-group -b aardvark-dns-${{ matrix.name }}-${{ env.AARDVARK_DNS_VERSION }}
+
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: aardvark-dns-${{ matrix.name }}-${{ env.AARDVARK_DNS_VERSION }}.*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aardvark-dns-${{ matrix.name }}-${{ env.AARDVARK_DNS_VERSION }}
+          path: aardvark-dns-${{ matrix.name }}-${{ env.AARDVARK_DNS_VERSION }}.*
+          if-no-files-found: error
+
+  upload:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token for AWS login
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: aardvark-dns-*
+          merge-multiple: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ap-southeast-2
+          role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload
+          role-session-name: GHA@3PB=aardvark-dns
+
+      - name: Upload
+        run: |
+          for f in aardvark-dns-*; do
+            aws s3 cp $f s3://bes-ops-tools/aardvark-dns/${{ env.AARDVARK_DNS_VERSION }}/$f --no-progress
+          done
+
+      - name: Clear cache
+        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths '/aardvark-dns/*'

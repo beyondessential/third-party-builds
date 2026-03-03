@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   generate-repo:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
     steps:
       - name: Install dependencies

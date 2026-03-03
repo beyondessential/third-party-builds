@@ -142,7 +142,7 @@ jobs:
 
   upload:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     permissions:
       contents: read
       id-token: write # OIDC token for AWS login

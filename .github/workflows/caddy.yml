@@ -19,7 +19,7 @@ concurrency:
 
 env:
   GO_VERSION: 1.26.0
-  CADDY_VERSION: 2.11.1
+  CADDY_VERSION: 2.10.2
 
 jobs:
   build:
@@ -63,7 +63,6 @@ jobs:
           xcaddy build v${{ env.CADDY_VERSION }} \
             --with github.com/caddy-dns/route53@v1.6.0 \
             --with github.com/mholt/caddy-ratelimit \
-            --with github.com/mholt/caddy-l4 \
             --with github.com/corazawaf/coraza-caddy/v2
         env:
           GOOS: ${{ matrix.goos }}

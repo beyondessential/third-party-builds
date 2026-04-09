@@ -51,7 +51,17 @@ jobs:
           do
             arch=$(cut -d. -f1 <<< "$archs")
             target=$(cut -d. -f2 <<< "$archs")
-            for dir in aardvark-dns crun podman netavark caddy bestool; do
+            # Container runtime tools: pull only the glibc-2.35-compatible (gnu35) builds.
+            # Both gnu (>=2.38) and gnu35 (>=2.35) builds exist in S3, and if both are
+            # indexed they produce duplicate Package+Version+Arch entries that confuse APT.
+            # The gnu35 builds satisfy glibc >=2.35, so they work on Debian Bookworm (2.36)
+            # and Ubuntu 24.04 (2.39) alike — there is no benefit to shipping the gnu builds.
+            for dir in aardvark-dns crun podman netavark; do
+              mkdir -p repo/pool/$arch/$dir
+              aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-${target}-unknown-linux-gnu35-*.deb"
+            done
+            # Other packages do not have glibc-specific variants; use the standard pattern.
+            for dir in caddy bestool; do
               mkdir -p repo/pool/$arch/$dir
               aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-$target-*.deb"
             done

@@ -61,9 +61,15 @@ jobs:
               aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-${target}-unknown-linux-gnu35-*.deb"
             done
             # Other packages do not have glibc-specific variants; use the standard pattern.
-            for dir in caddy bestool; do
+            for dir in caddy bestool algae; do
               mkdir -p repo/pool/$arch/$dir
               aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-$target-*.deb"
+            done
+            # bestool-alertd and bestool-psql also publish an unversioned-filename copy
+            # of the current deb under latest/; skip it to avoid duplicate Package+Version+Arch entries.
+            for dir in bestool-alertd bestool-psql; do
+              mkdir -p repo/pool/$arch/$dir
+              aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-$target-*.deb" --exclude "latest/*"
             done
           done
           find repo/pool -name "*.deb" -type f

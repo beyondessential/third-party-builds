@@ -1,0 +1,155 @@
+name: buildah
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/buildah.yml
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  attestations: write
+
+env:
+  GO_VERSION: 1.26.3
+  BUILDAH_VERSION: 1.43.1
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            name: x86_64-unknown-linux-gnu
+            goos: linux
+            goarch: amd64
+            debarch: amd64
+            glibc: 2.38
+          - os: ubuntu-22.04
+            name: x86_64-unknown-linux-gnu35
+            goos: linux
+            goarch: amd64
+            debarch: amd64
+            glibc: 2.35
+          - os: ubuntu-24.04-arm
+            name: aarch64-unknown-linux-gnu
+            goos: linux
+            goarch: arm64
+            debarch: arm64
+            glibc: 2.38
+          - os: ubuntu-22.04-arm
+            name: aarch64-unknown-linux-gnu35
+            goos: linux
+            goarch: arm64
+            debarch: arm64
+            glibc: 2.35
+
+    runs-on: ${{ matrix.os }}
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+    steps:
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Checkout buildah source
+        uses: actions/checkout@v4
+        with:
+          repository: containers/buildah
+          ref: v${{ env.BUILDAH_VERSION }}
+
+      - name: Install buildah dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            btrfs-progs \
+            build-essential \
+            git \
+            go-md2man \
+            libapparmor-dev \
+            libbtrfs-dev \
+            libc6-dev \
+            libdevmapper-dev \
+            libseccomp-dev \
+            libselinux1-dev \
+            libsubid-dev \
+            libsystemd-dev \
+            pkg-config
+
+      # containers_image_openpgp swaps the libgpgme link for a pure-Go OpenPGP
+      # implementation, so the binary doesn't depend on libgpgme.so.11 (which
+      # Ubuntu 26.04 dropped in favour of libgpgme.so.45).
+      - run: make BUILDTAGS="apparmor seccomp systemd exclude_graphdriver_devicemapper containers_image_openpgp" PREFIX=/usr
+      - run: mkdir buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}
+      - run: make DESTDIR=$(pwd)/buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }} PREFIX=/usr install install.completions
+      - name: Add /usr/local/bin/buildah symlink for back-compat
+        run: |
+          dest=buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}
+          mkdir -p "$dest/usr/local/bin"
+          ln -s /usr/bin/buildah "$dest/usr/local/bin/buildah"
+      - run: tar -caf buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}.tar.zst buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}
+
+      - name: Make deb
+        run: |
+          mkdir -p buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}/DEBIAN
+          cat <<EOF > buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}/DEBIAN/control
+          Package: buildah
+          Version: ${{ env.BUILDAH_VERSION }}-bes1
+          Architecture: ${{ matrix.debarch }}
+          Priority: optional
+          Section: universe/admin
+          Maintainer: BES <support@bes.au>
+          Bugs: https://github.com/containers/buildah/issues
+          Depends: containers-common, crun | runc, libc6 (>= ${{ matrix.glibc }}), libdevmapper1.02.1 (>= 2:1.02.97), libseccomp2 (>= 2.5.0), libsubid4 (>= 1:4.11.1) | libsubid5
+          Recommends: catatonit | tini | dumb-init, passt | slirp4netns, uidmap
+          Suggests: containers-storage, fuse-overlayfs
+          Enhances: podman
+          Homepage: https://buildah.io
+          Description: A tool which facilitates building OCI container images
+          EOF
+          dpkg-deb --root-owner-group -b buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}
+
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}.*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}
+          path: buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}.*
+          if-no-files-found: error
+
+  upload:
+    needs: build
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: buildah-*
+          merge-multiple: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ap-southeast-2
+          role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload
+          role-session-name: GHA@3PB=buildah
+
+      - name: Upload
+        run: |
+          for f in buildah-*; do
+            aws s3 cp "$f" "s3://bes-ops-tools/buildah/${{ env.BUILDAH_VERSION }}/$f" --no-progress
+          done
+
+      - name: Clear cache
+        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths '/buildah/*'

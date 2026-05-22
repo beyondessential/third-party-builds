@@ -128,7 +128,7 @@ jobs:
           Section: universe/admin
           Maintainer: BES <support@bes.au>
           Bugs: https://github.com/containers/podman/issues
-          Depends: conmon, crun | runc, golang-github-containers-common, libc6 (>= ${{ matrix.glibc }}), libdevmapper1.02.1 (>= 2:1.02.97), libseccomp2 (>= 2.5.0), libsqlite3-0 (>= 3.36.0), libsubid4 (>= 1:4.11.1)
+          Depends: conmon, crun | runc, golang-github-containers-common, libc6 (>= ${{ matrix.glibc }}), libdevmapper1.02.1 (>= 2:1.02.97), libseccomp2 (>= 2.5.0), libsqlite3-0 (>= 3.36.0), libsubid4 (>= 1:4.11.1) | libsubid5
           Recommends: buildah (>= 1.31), libgpgme11t64 (>= 1.4.1), catatonit | tini | dumb-init, dbus-user-session, passt, slirp4netns, uidmap
           Suggests: containers-storage, docker-compose, podman-compose, iptables
           Homepage: https://github.com/containers/podman

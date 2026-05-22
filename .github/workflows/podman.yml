@@ -107,7 +107,11 @@ jobs:
             zstd
           sudo sysctl kernel.unprivileged_userns_clone=1
 
-      - run: make BUILDTAGS="apparmor cni seccomp systemd exclude_graphdriver_devicemapper" PREFIX=/usr
+      # containers_image_openpgp swaps the libgpgme link for a pure-Go OpenPGP
+      # implementation. Without it the binary depends on libgpgme.so.11, which
+      # Ubuntu 26.04 no longer ships (the package is libgpgme45 there, with a
+      # bumped SONAME).
+      - run: make BUILDTAGS="apparmor cni seccomp systemd exclude_graphdriver_devicemapper containers_image_openpgp" PREFIX=/usr
       - run: mkdir podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
       - run: make DESTDIR=$(pwd)/podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }} PREFIX=/usr install
       - name: Add /usr/local/bin/podman symlink for back-compat
@@ -129,7 +133,7 @@ jobs:
           Maintainer: BES <support@bes.au>
           Bugs: https://github.com/containers/podman/issues
           Depends: conmon, crun | runc, golang-github-containers-common, libc6 (>= ${{ matrix.glibc }}), libdevmapper1.02.1 (>= 2:1.02.97), libseccomp2 (>= 2.5.0), libsqlite3-0 (>= 3.36.0), libsubid4 (>= 1:4.11.1) | libsubid5
-          Recommends: buildah (>= 1.31), libgpgme11t64 (>= 1.4.1), catatonit | tini | dumb-init, dbus-user-session, passt, slirp4netns, uidmap
+          Recommends: buildah (>= 1.31), catatonit | tini | dumb-init, dbus-user-session, passt, slirp4netns, uidmap
           Suggests: containers-storage, docker-compose, podman-compose, iptables
           Homepage: https://github.com/containers/podman
           Description: tool to manage containers and pods

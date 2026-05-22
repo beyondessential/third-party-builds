@@ -199,7 +199,9 @@ jobs:
           caddy version
           crun --version
           /usr/local/libexec/podman/netavark --version
-          podman --version
+          /usr/bin/podman --version
+          /usr/local/bin/podman --version
+          [ "$(readlink /usr/local/bin/podman)" = /usr/bin/podman ]
           bestool --version
           bestool-psql -h
           bestool-alertd -h
@@ -214,3 +216,54 @@ jobs:
         run: |
           id caddy
           groups caddy
+
+  test-repo-26-04:
+    needs: generate-repo
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Wait for CloudFront cache to clear
+        run: sleep 30
+
+      # GitHub Actions doesn't have ubuntu-26.04 runners yet; run the install
+      # check in an ubuntu:26.04 container on the matching host arch. This
+      # verifies our gnu35 debs install and run on the next LTS without
+      # waiting for the hosted-runner image to land.
+      - name: Install and verify on Ubuntu 26.04
+        run: |
+          docker run --rm -i \
+            -e DEBIAN_FRONTEND=noninteractive \
+            ubuntu:26.04 \
+            bash -euxo pipefail <<'EOF'
+          apt-get update
+          apt-get install -y curl gpg ca-certificates
+          mkdir -p /etc/apt/keyrings
+          curl -fsSL https://tools.ops.tamanu.io/apt/bes-tools.gpg.key \
+            | gpg --dearmor -o /etc/apt/keyrings/bes-tools.gpg
+          echo "deb [signed-by=/etc/apt/keyrings/bes-tools.gpg] https://tools.ops.tamanu.io/apt stable main" \
+            > /etc/apt/sources.list.d/bes-tools.list
+          cat > /etc/apt/preferences.d/bes-tools <<PIN
+          Package: *
+          Pin: origin tools.ops.tamanu.io
+          Pin-Priority: 999
+          PIN
+          apt-get update
+          apt-get install -y aardvark-dns caddy crun netavark podman \
+            bestool bestool-psql bestool-alertd algae
+          /usr/local/libexec/podman/aardvark-dns --version
+          caddy version
+          crun --version
+          /usr/local/libexec/podman/netavark --version
+          /usr/bin/podman --version
+          /usr/local/bin/podman --version
+          [ "$(readlink /usr/local/bin/podman)" = /usr/bin/podman ]
+          bestool --version
+          bestool-psql -h
+          bestool-alertd -h
+          algae --version
+          EOF

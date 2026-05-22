@@ -128,6 +128,23 @@ https://tools.ops.tamanu.io/podman/{version}/podman-{target}-{version}.tar.zst
 https://tools.ops.tamanu.io/podman/{version}/podman-{target}-{version}.deb
 ```
 
+### [libkrunfw](./.github/workflows/libkrunfw.yml) / [libkrun](./.github/workflows/libkrun.yml) / [krun](./.github/workflows/krun.yml)
+
+- Upstream: <https://github.com/containers/libkrunfw>, <https://github.com/containers/libkrun>, <https://github.com/containers/crun>
+- Targets: Linux (x64 and ARM64), KVM hosts only
+- Package: .deb (each)
+- APT: Available in repository
+
+Reason: the libkrun stack (kernel-image-as-shared-library + Rust runtime library + crun-with-libkrun) is not packaged by Ubuntu or Debian at all. Allows `podman --runtime krun` for KVM-based microVM isolation.
+
+The three packages must be built in order: libkrunfw → libkrun → krun. Each pulls its predecessor from this apt repo at build time.
+
+```
+https://tools.ops.tamanu.io/libkrunfw/{version}/libkrunfw-{target}-{version}.deb
+https://tools.ops.tamanu.io/libkrun/{version}/libkrun-{target}-{version}.deb
+https://tools.ops.tamanu.io/krun/{version}/krun-{target}-{version}.deb
+```
+
 ### [passt](./.github/workflows/passt.yml)
 
 - Upstream: <https://passt.top>

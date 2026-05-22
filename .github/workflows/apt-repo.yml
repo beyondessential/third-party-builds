@@ -5,7 +5,7 @@ on:
   schedule:
     - cron: "0 */12 * * *" # Twice a day
   workflow_run:
-    workflows: ["aardvark-dns", "buildah", "caddy", "crun", "netavark", "passt", "podman"]
+    workflows: ["aardvark-dns", "buildah", "caddy", "crun", "krun", "libkrun", "libkrunfw", "netavark", "passt", "podman"]
     types: [completed]
     branches: [main]
   push:
@@ -56,7 +56,7 @@ jobs:
             # indexed they produce duplicate Package+Version+Arch entries that confuse APT.
             # The gnu35 builds satisfy glibc >=2.35, so they work on Debian Bookworm (2.36)
             # and Ubuntu 24.04 (2.39) alike — there is no benefit to shipping the gnu builds.
-            for dir in aardvark-dns buildah crun netavark passt podman; do
+            for dir in aardvark-dns buildah crun krun libkrun libkrunfw netavark passt podman; do
               mkdir -p repo/pool/$arch/$dir
               aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-${target}-unknown-linux-gnu35-*.deb"
             done
@@ -190,7 +190,7 @@ jobs:
 
       - name: Install packages from repository
         run: |
-          sudo apt-get install -y aardvark-dns buildah caddy crun netavark passt podman bestool bestool-{psql,alertd} algae
+          sudo apt-get install -y aardvark-dns buildah caddy crun krun netavark passt podman bestool bestool-{psql,alertd} algae
 
       - name: Verify installations
         run: |
@@ -201,6 +201,7 @@ jobs:
           [ "$(readlink /usr/local/bin/buildah)" = /usr/bin/buildah ]
           caddy version
           crun --version
+          krun --version
           /usr/local/libexec/podman/netavark --version
           passt --version
           pasta --version
@@ -258,7 +259,7 @@ jobs:
           Pin-Priority: 999
           PIN
           apt-get update
-          apt-get install -y aardvark-dns buildah caddy crun netavark passt podman \
+          apt-get install -y aardvark-dns buildah caddy crun krun netavark passt podman \
             bestool bestool-psql bestool-alertd algae
           /usr/local/libexec/podman/aardvark-dns --version
           /usr/bin/buildah --version
@@ -266,6 +267,7 @@ jobs:
           [ "$(readlink /usr/local/bin/buildah)" = /usr/bin/buildah ]
           caddy version
           crun --version
+          krun --version
           /usr/local/libexec/podman/netavark --version
           passt --version
           pasta --version

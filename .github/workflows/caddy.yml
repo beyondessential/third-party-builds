@@ -99,7 +99,7 @@ jobs:
           # Create control file
           cat > caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/control <<EOF
           Package: caddy
-          Version: ${{ env.CADDY_VERSION }}
+          Version: ${{ env.CADDY_VERSION }}-bes1
           Architecture: ${{ matrix.debarch }}
           Priority: optional
           Section: net

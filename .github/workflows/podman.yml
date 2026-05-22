@@ -126,7 +126,7 @@ jobs:
           mkdir -p podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}/DEBIAN
           cat <<EOF > podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}/DEBIAN/control
           Package: podman
-          Version: ${{env.PODMAN_VERSION}}
+          Version: ${{env.PODMAN_VERSION}}-bes1
           Architecture: ${{ matrix.debarch }}
           Priority: optional
           Section: universe/admin

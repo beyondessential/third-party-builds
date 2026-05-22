@@ -62,7 +62,7 @@ jobs:
           mkdir -p aardvark-dns-${{ matrix.name }}-${{ env.AARDVARK_DNS_VERSION }}/DEBIAN
           cat <<EOF > aardvark-dns-${{ matrix.name }}-${{ env.AARDVARK_DNS_VERSION }}/DEBIAN/control
           Package: aardvark-dns
-          Version: ${{ env.AARDVARK_DNS_VERSION }}
+          Version: ${{ env.AARDVARK_DNS_VERSION }}-bes1
           Architecture: ${{ matrix.debarch }}
           Priority: optional
           Section: universe/net

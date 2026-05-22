@@ -68,7 +68,7 @@ jobs:
           mkdir -p netavark-${{ matrix.name }}-${{ env.NETAVARK_VERSION }}/DEBIAN
           cat <<EOF > netavark-${{ matrix.name }}-${{ env.NETAVARK_VERSION }}/DEBIAN/control
           Package: netavark
-          Version: ${{env.NETAVARK_VERSION}}
+          Version: ${{env.NETAVARK_VERSION}}-bes1
           Architecture: ${{ matrix.debarch }}
           Priority: optional
           Section: universe/net

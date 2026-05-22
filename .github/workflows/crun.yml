@@ -95,7 +95,7 @@ jobs:
           mkdir -p crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}/DEBIAN
           cat <<EOF > crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}/DEBIAN/control
           Package: crun
-          Version: ${{env.CRUN_VERSION}}
+          Version: ${{env.CRUN_VERSION}}-bes1
           Architecture: ${{ matrix.debarch }}
           Priority: optional
           Section: universe/admin

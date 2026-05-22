@@ -1,0 +1,133 @@
+name: libkrun
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/libkrun.yml
+
+permissions:
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  LIBKRUN_VERSION: 1.18.1
+  # Must match a libkrunfw we've already published to the apt repo / CDN.
+  LIBKRUNFW_VERSION: 5.4.0
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            name: x86_64-unknown-linux-gnu
+            debarch: amd64
+            glibc: 2.38
+          - os: ubuntu-22.04
+            name: x86_64-unknown-linux-gnu35
+            debarch: amd64
+            glibc: 2.35
+          - os: ubuntu-24.04-arm
+            name: aarch64-unknown-linux-gnu
+            debarch: arm64
+            glibc: 2.38
+          - os: ubuntu-22.04-arm
+            name: aarch64-unknown-linux-gnu35
+            debarch: arm64
+            glibc: 2.35
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout libkrun source
+        uses: actions/checkout@v4
+        with:
+          repository: containers/libkrun
+          ref: v${{ env.LIBKRUN_VERSION }}
+
+      - run: rustup toolchain install stable --profile minimal
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang pkg-config
+
+      # libkrun needs libkrunfw available at build time. Pull the previously
+      # published libkrunfw deb from our own apt repo (CDN URL) and install it.
+      # If this 404s, run the libkrunfw workflow first.
+      - name: Install libkrunfw from the BES apt repo
+        run: |
+          deb="libkrunfw-${{ matrix.name }}-${{ env.LIBKRUNFW_VERSION }}.deb"
+          curl -fsSL "https://tools.ops.tamanu.io/libkrunfw/${{ env.LIBKRUNFW_VERSION }}/$deb" -o "$deb"
+          sudo dpkg -i "$deb"
+
+      - run: make
+
+      - run: mkdir libkrun-${{ matrix.name }}-${{ env.LIBKRUN_VERSION }}
+      - run: make install DESTDIR=$(pwd)/libkrun-${{ matrix.name }}-${{ env.LIBKRUN_VERSION }} PREFIX=/usr LIBDIR_Linux=lib
+      - run: tar -caf libkrun-${{ matrix.name }}-${{ env.LIBKRUN_VERSION }}.tar.zst libkrun-${{ matrix.name }}-${{ env.LIBKRUN_VERSION }}
+
+      - name: Make deb
+        run: |
+          mkdir -p libkrun-${{ matrix.name }}-${{ env.LIBKRUN_VERSION }}/DEBIAN
+          cat <<EOF > libkrun-${{ matrix.name }}-${{ env.LIBKRUN_VERSION }}/DEBIAN/control
+          Package: libkrun1
+          Version: ${{ env.LIBKRUN_VERSION }}-bes1
+          Architecture: ${{ matrix.debarch }}
+          Priority: optional
+          Section: universe/libs
+          Maintainer: BES <support@bes.au>
+          Bugs: https://github.com/containers/libkrun/issues
+          Depends: libc6 (>= ${{ matrix.glibc }}), libkrunfw5
+          Homepage: https://github.com/containers/libkrun
+          Description: Dynamic library for running processes in KVM-based microVMs
+           libkrun is a dynamic library that allows programs to use the KVM
+           hypervisor as a process isolation mechanism, by setting up a
+           microVM around the workload using the libkrunfw kernel image.
+          EOF
+          dpkg-deb --root-owner-group -b libkrun-${{ matrix.name }}-${{ env.LIBKRUN_VERSION }}
+
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: libkrun-${{ matrix.name }}-${{ env.LIBKRUN_VERSION }}.*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libkrun-${{ matrix.name }}-${{ env.LIBKRUN_VERSION }}
+          path: libkrun-${{ matrix.name }}-${{ env.LIBKRUN_VERSION }}.*
+          if-no-files-found: error
+
+  upload:
+    needs: build
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: libkrun-*
+          merge-multiple: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ap-southeast-2
+          role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload
+          role-session-name: GHA@3PB=libkrun
+
+      - name: Upload
+        run: |
+          for f in libkrun-*; do
+            aws s3 cp "$f" "s3://bes-ops-tools/libkrun/${{ env.LIBKRUN_VERSION }}/$f" --no-progress
+          done
+
+      - name: Clear cache
+        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths '/libkrun/*'

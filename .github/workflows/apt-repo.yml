@@ -5,7 +5,7 @@ on:
   schedule:
     - cron: "0 */12 * * *" # Twice a day
   workflow_run:
-    workflows: ["aardvark-dns", "crun", "netavark", "podman", "caddy"]
+    workflows: ["aardvark-dns", "buildah", "caddy", "crun", "netavark", "passt", "podman"]
     types: [completed]
     branches: [main]
   push:
@@ -56,7 +56,7 @@ jobs:
             # indexed they produce duplicate Package+Version+Arch entries that confuse APT.
             # The gnu35 builds satisfy glibc >=2.35, so they work on Debian Bookworm (2.36)
             # and Ubuntu 24.04 (2.39) alike — there is no benefit to shipping the gnu builds.
-            for dir in aardvark-dns crun podman netavark; do
+            for dir in aardvark-dns buildah crun netavark passt podman; do
               mkdir -p repo/pool/$arch/$dir
               aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-${target}-unknown-linux-gnu35-*.deb"
             done
@@ -190,15 +190,20 @@ jobs:
 
       - name: Install packages from repository
         run: |
-          sudo apt-get install -y aardvark-dns caddy crun netavark podman bestool bestool-{psql,alertd} algae
+          sudo apt-get install -y aardvark-dns buildah caddy crun netavark passt podman bestool bestool-{psql,alertd} algae
 
       - name: Verify installations
         run: |
           set -x
           /usr/local/libexec/podman/aardvark-dns --version
+          /usr/bin/buildah --version
+          /usr/local/bin/buildah --version
+          [ "$(readlink /usr/local/bin/buildah)" = /usr/bin/buildah ]
           caddy version
           crun --version
           /usr/local/libexec/podman/netavark --version
+          passt --version
+          pasta --version
           /usr/bin/podman --version
           /usr/local/bin/podman --version
           [ "$(readlink /usr/local/bin/podman)" = /usr/bin/podman ]
@@ -253,12 +258,17 @@ jobs:
           Pin-Priority: 999
           PIN
           apt-get update
-          apt-get install -y aardvark-dns caddy crun netavark podman \
+          apt-get install -y aardvark-dns buildah caddy crun netavark passt podman \
             bestool bestool-psql bestool-alertd algae
           /usr/local/libexec/podman/aardvark-dns --version
+          /usr/bin/buildah --version
+          /usr/local/bin/buildah --version
+          [ "$(readlink /usr/local/bin/buildah)" = /usr/bin/buildah ]
           caddy version
           crun --version
           /usr/local/libexec/podman/netavark --version
+          passt --version
+          pasta --version
           /usr/bin/podman --version
           /usr/local/bin/podman --version
           [ "$(readlink /usr/local/bin/podman)" = /usr/bin/podman ]

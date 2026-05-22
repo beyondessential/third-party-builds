@@ -52,7 +52,7 @@ Pin-Priority: 999
 EOF
 
 sudo apt-get update
-sudo apt-get install aardvark-dns caddy podman crun netavark
+sudo apt-get install aardvark-dns buildah caddy crun netavark passt podman
 ```
 
 ## Builds
@@ -86,6 +86,20 @@ https://tools.ops.tamanu.io/caddy/{version}/caddy-{target}-{version}.deb
 https://tools.ops.tamanu.io/caddy/latest/caddy-{target}
 ```
 
+### [Buildah](./.github/workflows/buildah.yml)
+
+- Upstream: <https://github.com/containers/buildah>
+- Targets: Linux (x64 and ARM64)
+- Package: tar.zst and .deb
+- APT: Available in repository
+
+Reason: `podman build` delegates to buildah's logic, and Ubuntu LTS ships versions significantly behind upstream. Matched to our podman build.
+
+```
+https://tools.ops.tamanu.io/buildah/{version}/buildah-{target}-{version}.tar.zst
+https://tools.ops.tamanu.io/buildah/{version}/buildah-{target}-{version}.deb
+```
+
 ### [crun](./.github/workflows/crun.yml)
 
 - Upstream: <https://github.com/containers/crun>
@@ -112,6 +126,20 @@ Reason: upstream doesn't provide builds.
 ```
 https://tools.ops.tamanu.io/podman/{version}/podman-{target}-{version}.tar.zst
 https://tools.ops.tamanu.io/podman/{version}/podman-{target}-{version}.deb
+```
+
+### [passt](./.github/workflows/passt.yml)
+
+- Upstream: <https://passt.top>
+- Targets: Linux (x64 and ARM64)
+- Package: tar.zst and .deb
+- APT: Available in repository
+
+Reason: `pasta` (provided by the passt package) is the default rootless network backend for podman 5. The project ships date-tagged snapshots and develops rapidly, so distro packages lag meaningfully behind upstream.
+
+```
+https://tools.ops.tamanu.io/passt/{version}/passt-{target}-{version}.tar.zst
+https://tools.ops.tamanu.io/passt/{version}/passt-{target}-{version}.deb
 ```
 
 ### [Netavark](./.github/workflows/netavark.yml)

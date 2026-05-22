@@ -1,0 +1,160 @@
+name: krun
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/krun.yml
+
+permissions:
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  # krun is crun built --with-libkrun and renamed. Use the same crun source
+  # version as our regular crun.yml so behaviour stays in sync.
+  CRUN_VERSION: 1.27.1
+  # Must match libkrun (and transitively libkrunfw) versions we've published
+  # to the apt repo.
+  LIBKRUN_VERSION: 1.18.1
+  LIBKRUNFW_VERSION: 5.4.0
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            name: x86_64-unknown-linux-gnu
+            debarch: amd64
+            glibc: 2.38
+          - os: ubuntu-22.04
+            name: x86_64-unknown-linux-gnu35
+            debarch: amd64
+            glibc: 2.35
+          - os: ubuntu-24.04-arm
+            name: aarch64-unknown-linux-gnu
+            debarch: arm64
+            glibc: 2.38
+          - os: ubuntu-22.04-arm
+            name: aarch64-unknown-linux-gnu35
+            debarch: arm64
+            glibc: 2.35
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout crun source
+        uses: actions/checkout@v4
+        with:
+          repository: containers/crun
+          ref: ${{ env.CRUN_VERSION }}
+
+      - name: Install crun build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf \
+            automake \
+            build-essential \
+            gcc \
+            git \
+            go-md2man \
+            libcap-dev \
+            libprotobuf-c-dev \
+            libseccomp-dev \
+            libsystemd-dev \
+            libtool \
+            libyajl-dev \
+            make \
+            pkgconf \
+            python3 \
+            zstd
+
+      # libkrun (and the libkrunfw it depends on) need to be installed for
+      # crun's --with-libkrun to find the header and link against the .so.
+      # Pull both from our own apt repo (CDN URL). If either 404s, run the
+      # libkrunfw / libkrun workflows first.
+      - name: Install libkrunfw + libkrun from the BES apt repo
+        run: |
+          fw="libkrunfw-${{ matrix.name }}-${{ env.LIBKRUNFW_VERSION }}.deb"
+          kr="libkrun-${{ matrix.name }}-${{ env.LIBKRUN_VERSION }}.deb"
+          curl -fsSL "https://tools.ops.tamanu.io/libkrunfw/${{ env.LIBKRUNFW_VERSION }}/$fw" -o "$fw"
+          curl -fsSL "https://tools.ops.tamanu.io/libkrun/${{ env.LIBKRUN_VERSION }}/$kr" -o "$kr"
+          sudo dpkg -i "$fw" "$kr"
+
+      - run: ./autogen.sh
+      - run: ./configure PREFIX=/usr CGO_ENABLED=0 --with-libkrun
+      - run: make PREFIX=/usr CGO_ENABLED=0
+
+      # crun with libkrun support inspects argv[0]: when invoked as `krun` it
+      # uses the libkrun runtime, otherwise it behaves as standard crun. So we
+      # install only the binary, renamed to krun, into the deb — the regular
+      # crun package stays untouched and users can install both side by side.
+      - run: mkdir -p krun-${{ matrix.name }}-${{ env.CRUN_VERSION }}/usr/bin
+      - run: install -m 0755 crun krun-${{ matrix.name }}-${{ env.CRUN_VERSION }}/usr/bin/krun
+      - run: tar -caf krun-${{ matrix.name }}-${{ env.CRUN_VERSION }}.tar.zst krun-${{ matrix.name }}-${{ env.CRUN_VERSION }}
+
+      - name: Make deb
+        run: |
+          mkdir -p krun-${{ matrix.name }}-${{ env.CRUN_VERSION }}/DEBIAN
+          cat <<EOF > krun-${{ matrix.name }}-${{ env.CRUN_VERSION }}/DEBIAN/control
+          Package: krun
+          Version: ${{ env.CRUN_VERSION }}-bes1
+          Architecture: ${{ matrix.debarch }}
+          Priority: optional
+          Section: universe/admin
+          Maintainer: BES <support@bes.au>
+          Bugs: https://github.com/containers/crun/issues
+          Depends: libc6 (>= ${{ matrix.glibc }}), libcap2 (>= 1:2.10), libkrun1, libseccomp2 (>= 2.3.0), libsystemd0 (>= 246), libyajl2 (>= 2.0.4)
+          Enhances: podman
+          Homepage: https://github.com/containers/crun
+          Description: OCI runtime variant that uses libkrun to run containers in KVM-based microVMs
+           krun is crun built with libkrun support, installed under that name so
+           podman and other OCI runtimes can be configured to use it via
+           '--runtime krun'. Coexists with the standard crun package.
+          EOF
+          dpkg-deb --root-owner-group -b krun-${{ matrix.name }}-${{ env.CRUN_VERSION }}
+
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: krun-${{ matrix.name }}-${{ env.CRUN_VERSION }}.*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: krun-${{ matrix.name }}-${{ env.CRUN_VERSION }}
+          path: krun-${{ matrix.name }}-${{ env.CRUN_VERSION }}.*
+          if-no-files-found: error
+
+  upload:
+    needs: build
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: krun-*
+          merge-multiple: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ap-southeast-2
+          role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload
+          role-session-name: GHA@3PB=krun
+
+      - name: Upload
+        run: |
+          for f in krun-*; do
+            aws s3 cp "$f" "s3://bes-ops-tools/krun/${{ env.CRUN_VERSION }}/$f" --no-progress
+          done
+
+      - name: Clear cache
+        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths '/krun/*'

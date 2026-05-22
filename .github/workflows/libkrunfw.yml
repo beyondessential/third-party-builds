@@ -1,0 +1,131 @@
+name: libkrunfw
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/libkrunfw.yml
+
+permissions:
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  LIBKRUNFW_VERSION: 5.4.0
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            name: x86_64-unknown-linux-gnu
+            debarch: amd64
+            glibc: 2.38
+          - os: ubuntu-22.04
+            name: x86_64-unknown-linux-gnu35
+            debarch: amd64
+            glibc: 2.35
+          - os: ubuntu-24.04-arm
+            name: aarch64-unknown-linux-gnu
+            debarch: arm64
+            glibc: 2.38
+          - os: ubuntu-22.04-arm
+            name: aarch64-unknown-linux-gnu35
+            debarch: arm64
+            glibc: 2.35
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout libkrunfw source
+        uses: actions/checkout@v4
+        with:
+          repository: containers/libkrunfw
+          ref: v${{ env.LIBKRUNFW_VERSION }}
+
+      - name: Install kernel build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bc \
+            bison \
+            build-essential \
+            cpio \
+            curl \
+            flex \
+            libelf-dev \
+            libssl-dev \
+            python3 \
+            zstd
+
+      - run: make
+
+      # Upstream installs to /usr/lib64, which Ubuntu/Debian's dynamic linker
+      # doesn't search by default. LIBDIR_Linux=lib lands the .so under
+      # /usr/lib, which is on the default search path everywhere we care about.
+      - run: mkdir libkrunfw-${{ matrix.name }}-${{ env.LIBKRUNFW_VERSION }}
+      - run: make install DESTDIR=$(pwd)/libkrunfw-${{ matrix.name }}-${{ env.LIBKRUNFW_VERSION }} PREFIX=/usr LIBDIR_Linux=lib
+      - run: tar -caf libkrunfw-${{ matrix.name }}-${{ env.LIBKRUNFW_VERSION }}.tar.zst libkrunfw-${{ matrix.name }}-${{ env.LIBKRUNFW_VERSION }}
+
+      - name: Make deb
+        run: |
+          mkdir -p libkrunfw-${{ matrix.name }}-${{ env.LIBKRUNFW_VERSION }}/DEBIAN
+          cat <<EOF > libkrunfw-${{ matrix.name }}-${{ env.LIBKRUNFW_VERSION }}/DEBIAN/control
+          Package: libkrunfw5
+          Version: ${{ env.LIBKRUNFW_VERSION }}-bes1
+          Architecture: ${{ matrix.debarch }}
+          Priority: optional
+          Section: universe/libs
+          Maintainer: BES <support@bes.au>
+          Bugs: https://github.com/containers/libkrunfw/issues
+          Depends: libc6 (>= ${{ matrix.glibc }})
+          Homepage: https://github.com/containers/libkrunfw
+          Description: Linux kernel image bundled as a shared library for libkrun
+           libkrunfw embeds a Linux kernel image into a shared library so that
+           libkrun can load it as the guest kernel for its KVM-based microVMs.
+          EOF
+          dpkg-deb --root-owner-group -b libkrunfw-${{ matrix.name }}-${{ env.LIBKRUNFW_VERSION }}
+
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: libkrunfw-${{ matrix.name }}-${{ env.LIBKRUNFW_VERSION }}.*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libkrunfw-${{ matrix.name }}-${{ env.LIBKRUNFW_VERSION }}
+          path: libkrunfw-${{ matrix.name }}-${{ env.LIBKRUNFW_VERSION }}.*
+          if-no-files-found: error
+
+  upload:
+    needs: build
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: libkrunfw-*
+          merge-multiple: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ap-southeast-2
+          role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload
+          role-session-name: GHA@3PB=libkrunfw
+
+      - name: Upload
+        run: |
+          for f in libkrunfw-*; do
+            aws s3 cp "$f" "s3://bes-ops-tools/libkrunfw/${{ env.LIBKRUNFW_VERSION }}/$f" --no-progress
+          done
+
+      - name: Clear cache
+        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths '/libkrunfw/*'

@@ -109,7 +109,12 @@ jobs:
 
       - run: make BUILDTAGS="apparmor cni seccomp systemd exclude_graphdriver_devicemapper" PREFIX=/usr
       - run: mkdir podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
-      - run: make DESTDIR=$(pwd)/podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }} install
+      - run: make DESTDIR=$(pwd)/podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }} PREFIX=/usr install
+      - name: Add /usr/local/bin/podman symlink for back-compat
+        run: |
+          dest=podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
+          mkdir -p "$dest/usr/local/bin"
+          ln -s /usr/bin/podman "$dest/usr/local/bin/podman"
       - run: tar -caf podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}.tar.zst podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
 
       - name: Make deb

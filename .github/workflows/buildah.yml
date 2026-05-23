@@ -90,11 +90,6 @@ jobs:
       - run: make BUILDTAGS="apparmor seccomp systemd exclude_graphdriver_devicemapper containers_image_openpgp" PREFIX=/usr
       - run: mkdir buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}
       - run: make DESTDIR=$(pwd)/buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }} PREFIX=/usr install install.completions
-      - name: Add /usr/local/bin/buildah symlink for back-compat
-        run: |
-          dest=buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}
-          mkdir -p "$dest/usr/local/bin"
-          ln -s /usr/bin/buildah "$dest/usr/local/bin/buildah"
       - run: tar -caf buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}.tar.zst buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}
 
       - name: Make deb

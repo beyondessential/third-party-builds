@@ -196,9 +196,7 @@ jobs:
         run: |
           set -x
           /usr/local/libexec/podman/aardvark-dns --version
-          /usr/bin/buildah --version
-          /usr/local/bin/buildah --version
-          [ "$(readlink /usr/local/bin/buildah)" = /usr/bin/buildah ]
+          buildah --version
           caddy version
           crun --version
           krun --version
@@ -262,9 +260,7 @@ jobs:
           apt-get install -y aardvark-dns buildah caddy crun krun netavark passt podman \
             bestool bestool-psql bestool-alertd algae
           /usr/local/libexec/podman/aardvark-dns --version
-          /usr/bin/buildah --version
-          /usr/local/bin/buildah --version
-          [ "$(readlink /usr/local/bin/buildah)" = /usr/bin/buildah ]
+          buildah --version
           caddy version
           crun --version
           krun --version

@@ -63,6 +63,7 @@ jobs:
             libelf-dev \
             libssl-dev \
             python3 \
+            python3-pyelftools \
             zstd
 
       - run: make

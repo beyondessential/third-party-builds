@@ -7,6 +7,12 @@ on:
       - main
     paths:
       - .github/workflows/libkrun.yml
+  # Run after libkrunfw publishes, so a fresh libkrunfw deb is on the CDN
+  # by the time we try to install it below.
+  workflow_run:
+    workflows: ["libkrunfw"]
+    types: [completed]
+    branches: [main]
 
 permissions:
   id-token: write
@@ -23,6 +29,9 @@ env:
 
 jobs:
   build:
+    # When triggered via workflow_run, only run if the upstream succeeded.
+    # (Other trigger types don't set workflow_run.conclusion.)
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     strategy:
       fail-fast: false
       matrix:

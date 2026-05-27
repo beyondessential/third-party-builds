@@ -19,7 +19,7 @@ concurrency:
 
 env:
   GO_VERSION: 1.26.0
-  CADDY_VERSION: 2.10.2
+  CADDY_VERSION: 2.11.3
 
 jobs:
   build:
@@ -60,15 +60,17 @@ jobs:
       - run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
       - shell: bash
         run: |
-          # Plugin versions are pinned because we're held back on caddy 2.10:
-          # coraza-caddy v2.2.0+ requires caddy 2.11.2, and unpinned versions
-          # of these plugins resolve to those latest tags. Both pins target a
-          # caddy version that 2.10 satisfies (coraza v2.1.0 → 2.9.1+;
-          # caddy-ratelimit v0.1.0 → 2.8.0+).
+          # certmagic is pinned to the merge commit of caddyserver/certmagic#380
+          # ("Support listening on file descriptors"), which fixes fd-passing
+          # but landed just after certmagic v0.25.3 was tagged. Caddy 2.11.3
+          # still bundles v0.25.3, so without this replace, fd-based bind
+          # directives can't obtain certificates. Drop the --replace once a
+          # certmagic release including #380 ships and Caddy picks it up.
           xcaddy build v${{ env.CADDY_VERSION }} \
-            --with github.com/caddy-dns/route53@v1.6.0 \
+            --replace github.com/caddyserver/certmagic=github.com/caddyserver/certmagic@9b6be22a3ea4d6abfe96375b0ce494594cb754b2 \
+            --with github.com/caddy-dns/route53@v1.6.2 \
             --with github.com/mholt/caddy-ratelimit@v0.1.0 \
-            --with github.com/corazawaf/coraza-caddy/v2@v2.1.0
+            --with github.com/corazawaf/coraza-caddy/v2@v2.5.0
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}

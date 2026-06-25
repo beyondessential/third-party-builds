@@ -52,7 +52,7 @@ Pin-Priority: 999
 EOF
 
 sudo apt-get update
-sudo apt-get install aardvark-dns buildah caddy crun netavark passt podman
+sudo apt-get install aardvark-dns buildah caddy crun kopia netavark passt podman
 ```
 
 ## Builds
@@ -114,6 +114,19 @@ https://tools.ops.tamanu.io/crun/{version}/crun-{target}-{version}.tar.zst
 https://tools.ops.tamanu.io/crun/{version}/crun-{target}-{version}.deb
 ```
 
+### [Kopia](./.github/workflows/kopia.yml)
+
+- Upstream: <https://kopia.io>
+- Targets: Linux (x64 and ARM64)
+- Package: .deb
+- APT: Available in repository
+
+Reason: we build the lean version (no UI) and include a kopia system user/group/home.
+
+```
+https://tools.ops.tamanu.io/kopia/{version}/kopia-{target}-{version}.deb
+```
+
 ### [Podman](./.github/workflows/podman.yml)
 
 - Upstream: <https://github.com/containers/podman>
@@ -135,9 +148,7 @@ https://tools.ops.tamanu.io/podman/{version}/podman-{target}-{version}.deb
 - Package: .deb (each)
 - APT: Available in repository
 
-Reason: the libkrun stack (kernel-image-as-shared-library + Rust runtime library + crun-with-libkrun) is not packaged by Ubuntu or Debian at all. Allows `podman --runtime krun` for KVM-based microVM isolation.
-
-The three packages must be built in order: libkrunfw → libkrun → krun. Each pulls its predecessor from this apt repo at build time.
+Reason: the libkrun stack is not packaged by Ubuntu or Debian at all. Allows `podman --runtime krun` for KVM-based microVM isolation.
 
 ```
 https://tools.ops.tamanu.io/libkrunfw/{version}/libkrunfw-{target}-{version}.deb

@@ -5,7 +5,7 @@ on:
   schedule:
     - cron: "0 */3 * * *"
   workflow_run:
-    workflows: ["aardvark-dns", "buildah", "caddy", "crun", "krun", "libkrun", "libkrunfw", "netavark", "passt", "podman"]
+    workflows: ["aardvark-dns", "buildah", "caddy", "crun", "kopia", "krun", "libkrun", "libkrunfw", "netavark", "passt", "podman"]
     types: [completed]
     branches: [main]
   push:
@@ -61,7 +61,8 @@ jobs:
               aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-${target}-unknown-linux-gnu35-*.deb"
             done
             # Other packages do not have glibc-specific variants; use the standard pattern.
-            for dir in caddy bestool algae; do
+            # kopia is a static (CGO_ENABLED=0) Go binary, so it has no glibc variants either.
+            for dir in caddy kopia bestool algae; do
               mkdir -p repo/pool/$arch/$dir
               aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-$target-*.deb"
             done
@@ -190,7 +191,7 @@ jobs:
 
       - name: Install packages from repository
         run: |
-          sudo apt-get install -y aardvark-dns buildah caddy crun krun netavark passt podman bestool bestool-{psql,alertd} algae
+          sudo apt-get install -y aardvark-dns buildah caddy crun kopia krun netavark passt podman bestool bestool-{psql,alertd} algae
 
       - name: Verify installations
         run: |
@@ -199,6 +200,7 @@ jobs:
           buildah --version
           caddy version
           crun --version
+          kopia --version
           krun --version
           /usr/local/libexec/podman/netavark --version
           passt --version
@@ -220,6 +222,10 @@ jobs:
         run: |
           id caddy
           groups caddy
+          id kopia
+          groups kopia
+          getent passwd kopia | grep -q /var/lib/kopia
+          [ "$(stat -c '%U:%G' /var/lib/kopia)" = kopia:kopia ]
 
   test-repo-26-04:
     needs: generate-repo
@@ -257,12 +263,13 @@ jobs:
           Pin-Priority: 999
           PIN
           apt-get update
-          apt-get install -y aardvark-dns buildah caddy crun krun netavark passt podman \
+          apt-get install -y aardvark-dns buildah caddy crun kopia krun netavark passt podman \
             bestool bestool-psql bestool-alertd algae
           /usr/local/libexec/podman/aardvark-dns --version
           buildah --version
           caddy version
           crun --version
+          kopia --version
           krun --version
           /usr/local/libexec/podman/netavark --version
           passt --version

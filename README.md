@@ -52,7 +52,7 @@ Pin-Priority: 999
 EOF
 
 sudo apt-get update
-sudo apt-get install aardvark-dns buildah caddy crun netavark passt podman
+sudo apt-get install aardvark-dns buildah caddy crun kopia netavark passt podman
 ```
 
 ## Builds
@@ -112,6 +112,19 @@ Reason: .deb packaging for a version compatible with Podman 5.
 ```
 https://tools.ops.tamanu.io/crun/{version}/crun-{target}-{version}.tar.zst
 https://tools.ops.tamanu.io/crun/{version}/crun-{target}-{version}.deb
+```
+
+### [Kopia](./.github/workflows/kopia.yml)
+
+- Upstream: <https://kopia.io>
+- Targets: Linux (x64 and ARM64)
+- Package: .deb
+- APT: Available in repository
+
+Reason: upstream's deb ships only the bare binary. Ours builds a static, no-embedded-UI binary and adds a system `kopia` user/group with `/var/lib/kopia` as its home, so kopia can run as a service account.
+
+```
+https://tools.ops.tamanu.io/kopia/{version}/kopia-{target}-{version}.deb
 ```
 
 ### [Podman](./.github/workflows/podman.yml)

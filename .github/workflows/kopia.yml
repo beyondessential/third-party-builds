@@ -1,0 +1,169 @@
+name: kopia
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/kopia.yml
+
+permissions:
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  # Pin to the Go toolchain kopia's go.mod requests for this tag.
+  GO_VERSION: 1.25.11
+  KOPIA_VERSION: 0.23.1
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            name: x86_64-unknown-linux-gnu
+            goarch: amd64
+            debarch: amd64
+          - os: ubuntu-24.04-arm
+            name: aarch64-unknown-linux-gnu
+            goarch: arm64
+            debarch: arm64
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout kopia source
+        uses: actions/checkout@v4
+        with:
+          repository: kopia/kopia
+          ref: v${{ env.KOPIA_VERSION }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build kopia (static, no embedded UI)
+        env:
+          CGO_ENABLED: 0
+          GOOS: linux
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          set -x
+          # No -tags embedhtml => the lean "noui" build (matches `make install-noui`):
+          # the kopia server's browser UI is excluded. CGO_ENABLED=0 yields a fully
+          # static binary, so the resulting deb has no libc/glibc dependency.
+          commit=$(git rev-parse HEAD)
+          go build -trimpath \
+            -ldflags "-s -w \
+              -X github.com/kopia/kopia/repo.BuildVersion=${KOPIA_VERSION} \
+              -X github.com/kopia/kopia/repo.BuildInfo=${commit} \
+              -X github.com/kopia/kopia/repo.BuildGitHubRepo=kopia/kopia" \
+            -o kopia .
+          ./kopia --version
+
+      - name: Make deb
+        run: |
+          set -x
+          pkg=kopia-${{ matrix.name }}-${{ env.KOPIA_VERSION }}
+
+          install -Dm755 kopia $pkg/usr/bin/kopia
+          install -d -m 0750 $pkg/var/lib/kopia
+          mkdir -p $pkg/DEBIAN
+
+          cat > $pkg/DEBIAN/control <<EOF
+          Package: kopia
+          Version: ${{ env.KOPIA_VERSION }}-bes1
+          Architecture: ${{ matrix.debarch }}
+          Priority: optional
+          Section: admin
+          Maintainer: BES <support@bes.au>
+          Bugs: https://github.com/kopia/kopia/issues
+          Homepage: https://kopia.io
+          Description: Fast and secure open source backup. BES version
+           Statically-linked CLI build without the embedded server UI.
+           Creates a system kopia user/group with /var/lib/kopia as its home.
+          EOF
+
+          # Create the kopia system user/group and own its home on install.
+          cat > $pkg/DEBIAN/postinst <<'EOF'
+          #!/bin/sh
+          set -e
+
+          if ! getent group kopia >/dev/null; then
+              groupadd --system kopia
+          fi
+
+          if ! getent passwd kopia >/dev/null; then
+              useradd --system --gid kopia --home-dir /var/lib/kopia \
+                  --no-create-home --shell /usr/sbin/nologin kopia
+          fi
+
+          chown -R kopia:kopia /var/lib/kopia
+
+          #DEBHELPER#
+          EOF
+          chmod 755 $pkg/DEBIAN/postinst
+
+          # Remove the user/group only on purge.
+          cat > $pkg/DEBIAN/postrm <<'EOF'
+          #!/bin/sh
+          set -e
+
+          if [ "$1" = "purge" ]; then
+              if getent passwd kopia >/dev/null; then
+                  userdel kopia >/dev/null 2>&1 || true
+              fi
+              if getent group kopia >/dev/null; then
+                  groupdel kopia >/dev/null 2>&1 || true
+              fi
+          fi
+
+          #DEBHELPER#
+          EOF
+          chmod 755 $pkg/DEBIAN/postrm
+
+          dpkg-deb --root-owner-group -b $pkg
+
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: kopia-${{ matrix.name }}-${{ env.KOPIA_VERSION }}.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kopia-${{ matrix.name }}
+          path: kopia-${{ matrix.name }}-${{ env.KOPIA_VERSION }}.deb
+          if-no-files-found: error
+
+  upload:
+    needs: build
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+      id-token: write # OIDC token for AWS login
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: kopia-*
+          merge-multiple: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ap-southeast-2
+          role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload
+          role-session-name: GHA@3PB=kopia
+
+      - name: Upload
+        run: |
+          for f in kopia-*; do
+            [ -d "$f" ] && continue
+            aws s3 cp $f s3://bes-ops-tools/kopia/${{ env.KOPIA_VERSION }}/$f --no-progress
+          done
+
+      - name: Clear cache
+        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths '/kopia/*'

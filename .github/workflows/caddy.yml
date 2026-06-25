@@ -19,7 +19,7 @@ concurrency:
 
 env:
   GO_VERSION: 1.26.0
-  CADDY_VERSION: 2.11.3
+  CADDY_VERSION: 2.11.4
 
 jobs:
   build:
@@ -62,7 +62,7 @@ jobs:
         run: |
           # certmagic is pinned to the merge commit of caddyserver/certmagic#380
           # ("Support listening on file descriptors"), which fixes fd-passing
-          # but landed just after certmagic v0.25.3 was tagged. Caddy 2.11.3
+          # but landed just after certmagic v0.25.3 was tagged. Caddy 2.11.4
           # still bundles v0.25.3, so without this replace, fd-based bind
           # directives can't obtain certificates. Drop the --replace once a
           # certmagic release including #380 ships and Caddy picks it up.

@@ -18,7 +18,7 @@ permissions:
 
 env:
   GO_VERSION: 1.26.3
-  PODMAN_VERSION: 5.8.2
+  PODMAN_VERSION: 6.0.0
 
 jobs:
   build:
@@ -111,7 +111,9 @@ jobs:
       # implementation. Without it the binary depends on libgpgme.so.11, which
       # Ubuntu 26.04 no longer ships (the package is libgpgme45 there, with a
       # bumped SONAME).
-      - run: make BUILDTAGS="apparmor cni seccomp systemd exclude_graphdriver_devicemapper containers_image_openpgp" PREFIX=/usr
+      # The cni build tag is gone in Podman 6: CNI networking support was
+      # removed entirely, so Netavark is now the only backend.
+      - run: make BUILDTAGS="apparmor seccomp systemd exclude_graphdriver_devicemapper containers_image_openpgp" PREFIX=/usr
       - run: mkdir podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
       - run: make DESTDIR=$(pwd)/podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }} PREFIX=/usr install
       - name: Add /usr/local/bin/podman symlink for back-compat
@@ -132,9 +134,10 @@ jobs:
           Section: universe/admin
           Maintainer: BES <support@bes.au>
           Bugs: https://github.com/containers/podman/issues
-          Depends: conmon, crun | runc, golang-github-containers-common, libc6 (>= ${{ matrix.glibc }}), libdevmapper1.02.1 (>= 2:1.02.97), libseccomp2 (>= 2.5.0), libsqlite3-0 (>= 3.36.0), libsubid4 (>= 1:4.11.1) | libsubid5
-          Recommends: buildah (>= 1.31), catatonit | tini | dumb-init, dbus-user-session, passt, slirp4netns, uidmap
-          Suggests: containers-storage, docker-compose, podman-compose, iptables
+          Depends: conmon, crun | runc, containers-common (>= 0.68), netavark (>= 2.0.0), libc6 (>= ${{ matrix.glibc }}), libdevmapper1.02.1 (>= 2:1.02.97), libseccomp2 (>= 2.5.0), libsqlite3-0 (>= 3.36.0), libsubid4 (>= 1:4.11.1) | libsubid5
+          Recommends: aardvark-dns (>= 2.0.0), buildah (>= 1.44.0), catatonit | tini | dumb-init, dbus-user-session, passt, uidmap
+          Suggests: containers-storage, docker-compose, podman-compose, nftables
+          Breaks: buildah (<< 1.44.0), netavark (<< 2.0.0), aardvark-dns (<< 2.0.0), containers-common (<< 0.68), skopeo (<< 1.23.0)
           Homepage: https://github.com/containers/podman
           Description: tool to manage containers and pods
           EOF

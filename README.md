@@ -52,7 +52,7 @@ Pin-Priority: 999
 EOF
 
 sudo apt-get update
-sudo apt-get install aardvark-dns buildah caddy crun kopia netavark passt podman
+sudo apt-get install aardvark-dns buildah caddy containers-common crun kopia netavark passt podman skopeo
 ```
 
 ## Builds
@@ -98,6 +98,33 @@ Reason: `podman build` delegates to buildah's logic, and Ubuntu LTS ships versio
 ```
 https://tools.ops.tamanu.io/buildah/{version}/buildah-{target}-{version}.tar.zst
 https://tools.ops.tamanu.io/buildah/{version}/buildah-{target}-{version}.deb
+```
+
+### [Skopeo](./.github/workflows/skopeo.yml)
+
+- Upstream: <https://github.com/containers/skopeo>
+- Targets: Linux (x64 and ARM64)
+- Package: tar.zst and .deb
+- APT: Available in repository
+
+Reason: Podman 6 requirement.
+
+```
+https://tools.ops.tamanu.io/skopeo/{version}/skopeo-{target}-{version}.tar.zst
+https://tools.ops.tamanu.io/skopeo/{version}/skopeo-{target}-{version}.deb
+```
+
+### [containers-common](./.github/workflows/containers-common.yml)
+
+- Upstream: <https://github.com/containers/container-libs> (the `common/vX.Y.Z` tags)
+- Targets: Architecture-independent (config files and man pages only)
+- Package: .deb
+- APT: Available in repository
+
+Reason: Podman 6 requirement.
+
+```
+https://tools.ops.tamanu.io/containers-common/{version}/containers-common-{version}.deb
 ```
 
 ### [crun](./.github/workflows/crun.yml)

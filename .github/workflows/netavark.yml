@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NETAVARK_VERSION: 1.17.2
+  NETAVARK_VERSION: 2.0.0
 
 jobs:
   build:
@@ -77,8 +77,8 @@ jobs:
           Bugs: https://github.com/containers/netavark/issues
           Provides: container-network-stack (= 2)
           Depends: libc6 (>= ${{ matrix.glibc }}), libgcc-s1 (>= 4.2)
-          Recommends: aardvark-dns
-          Breaks: aardvark-dns (<< 1.4)
+          Recommends: aardvark-dns (>= 2.0.0)
+          Breaks: aardvark-dns (<< 2.0.0), podman (<< 6.0.0)
           Enhances: podman
           Homepage: https://github.com/containers/netavark
           Description: Rust based network stack for containers

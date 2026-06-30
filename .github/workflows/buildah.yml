@@ -18,7 +18,7 @@ permissions:
 
 env:
   GO_VERSION: 1.26.3
-  BUILDAH_VERSION: 1.43.1
+  BUILDAH_VERSION: 1.44.0
 
 jobs:
   build:
@@ -107,9 +107,10 @@ jobs:
           Section: universe/admin
           Maintainer: BES <support@bes.au>
           Bugs: https://github.com/containers/buildah/issues
-          Depends: golang-github-containers-common, crun | runc, libc6 (>= ${{ matrix.glibc }}), libdevmapper1.02.1 (>= 2:1.02.97), libseccomp2 (>= 2.5.0), libsubid4 (>= 1:4.11.1) | libsubid5
+          Depends: containers-common (>= 0.68), crun | runc, libc6 (>= ${{ matrix.glibc }}), libdevmapper1.02.1 (>= 2:1.02.97), libseccomp2 (>= 2.5.0), libsubid4 (>= 1:4.11.1) | libsubid5
           Recommends: catatonit | tini | dumb-init, passt | slirp4netns, uidmap
           Suggests: containers-storage, fuse-overlayfs
+          Breaks: podman (<< 6.0.0)
           Enhances: podman
           Homepage: https://buildah.io
           Description: A tool which facilitates building OCI container images

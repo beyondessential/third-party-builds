@@ -1,4 +1,4 @@
-This repository contains GitHub Actions workflows that build third-party software for BES' use.
+This repository contains GitHub Actions workflows that build third-party software for BES International's use.
 
 ## Generalities
 

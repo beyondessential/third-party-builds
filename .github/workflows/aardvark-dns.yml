@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AARDVARK_DNS_VERSION: 1.17.1
+  AARDVARK_DNS_VERSION: 2.0.0
 
 jobs:
   build:
@@ -70,6 +70,7 @@ jobs:
           Original-Maintainer: Reinhard Tartler <siretart@tauware.de>
           Bugs: https://github.com/containers/aardvark-dns/issues
           Depends: libc6 (>= ${{ matrix.glibc }}), libgcc-s1 (>= 4.2)
+          Breaks: netavark (<< 2.0.0), podman (<< 6.0.0)
           Enhances: netavark, podman
           Homepage: https://github.com/containers/aardvark-dns
           Description: Authoritative DNS server for A/AAAA container records

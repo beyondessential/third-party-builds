@@ -1,4 +1,4 @@
-name: buildah
+name: skopeo
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/buildah.yml
+      - .github/workflows/skopeo.yml
 
 concurrency:
   group: ${{ github.workflow }}
@@ -18,7 +18,7 @@ permissions:
 
 env:
   GO_VERSION: 1.26.3
-  BUILDAH_VERSION: 1.44.0
+  SKOPEO_VERSION: 1.23.0
 
 jobs:
   build:
@@ -60,13 +60,13 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Checkout buildah source
+      - name: Checkout skopeo source
         uses: actions/checkout@v4
         with:
-          repository: containers/buildah
-          ref: v${{ env.BUILDAH_VERSION }}
+          repository: containers/skopeo
+          ref: v${{ env.SKOPEO_VERSION }}
 
-      - name: Install buildah dependencies
+      - name: Install skopeo dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -74,52 +74,53 @@ jobs:
             build-essential \
             git \
             go-md2man \
-            libapparmor-dev \
             libbtrfs-dev \
             libc6-dev \
             libdevmapper-dev \
-            libseccomp-dev \
-            libselinux1-dev \
-            libsubid-dev \
-            libsystemd-dev \
             pkg-config
 
       # containers_image_openpgp swaps the libgpgme link for a pure-Go OpenPGP
       # implementation, so the binary doesn't depend on libgpgme.so.11 (which
       # Ubuntu 26.04 dropped in favour of libgpgme.so.45).
-      - run: make BUILDTAGS="apparmor seccomp systemd exclude_graphdriver_devicemapper containers_image_openpgp" PREFIX=/usr
-      - run: mkdir buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}
-      - run: make DESTDIR=$(pwd)/buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }} PREFIX=/usr install install.completions
-      - run: tar -caf buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}.tar.zst buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}
+      - run: make bin/skopeo BUILDTAGS="containers_image_openpgp exclude_graphdriver_devicemapper" PREFIX=/usr
+      - run: mkdir skopeo-${{ matrix.name }}-${{ env.SKOPEO_VERSION }}
+      # install the binary, man pages and shell completions only. policy.json
+      # and registries.d/default.yaml are owned by containers-common (which we
+      # depend on) — shipping them here too would create dpkg file conflicts.
+      - run: |
+          make DESTDIR=$(pwd)/skopeo-${{ matrix.name }}-${{ env.SKOPEO_VERSION }} PREFIX=/usr \
+            install-binary install-docs install-completions
+      - run: tar -caf skopeo-${{ matrix.name }}-${{ env.SKOPEO_VERSION }}.tar.zst skopeo-${{ matrix.name }}-${{ env.SKOPEO_VERSION }}
 
       - name: Make deb
         run: |
-          mkdir -p buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}/DEBIAN
-          cat <<EOF > buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}/DEBIAN/control
-          Package: buildah
-          Version: ${{ env.BUILDAH_VERSION }}-bes1
+          mkdir -p skopeo-${{ matrix.name }}-${{ env.SKOPEO_VERSION }}/DEBIAN
+          cat <<EOF > skopeo-${{ matrix.name }}-${{ env.SKOPEO_VERSION }}/DEBIAN/control
+          Package: skopeo
+          Version: ${{ env.SKOPEO_VERSION }}-bes1
           Architecture: ${{ matrix.debarch }}
           Priority: optional
           Section: universe/admin
           Maintainer: BES <support@bes.au>
-          Bugs: https://github.com/containers/buildah/issues
-          Depends: containers-common (>= 0.68), crun | runc, libc6 (>= ${{ matrix.glibc }}), libdevmapper1.02.1 (>= 2:1.02.97), libseccomp2 (>= 2.5.0), libsubid4 (>= 1:4.11.1) | libsubid5
-          Recommends: catatonit | tini | dumb-init, passt | slirp4netns, uidmap
-          Suggests: containers-storage, fuse-overlayfs
+          Bugs: https://github.com/containers/skopeo/issues
+          Depends: containers-common (>= 0.68), libc6 (>= ${{ matrix.glibc }})
           Breaks: podman (<< 6.0.0)
-          Enhances: podman
-          Homepage: https://buildah.io
-          Description: A tool which facilitates building OCI container images
+          Enhances: podman, buildah
+          Homepage: https://github.com/containers/skopeo
+          Description: Command line utility to interact with container images and registries
+           Skopeo works with remote container registries and local OCI/Docker
+           image stores to inspect, copy, sign and delete images without
+           requiring a daemon.
           EOF
-          dpkg-deb --root-owner-group -b buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}
+          dpkg-deb --root-owner-group -b skopeo-${{ matrix.name }}-${{ env.SKOPEO_VERSION }}
 
       - uses: actions/attest-build-provenance@v1
         with:
-          subject-path: buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}.*
+          subject-path: skopeo-${{ matrix.name }}-${{ env.SKOPEO_VERSION }}.*
       - uses: actions/upload-artifact@v4
         with:
-          name: buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}
-          path: buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}.*
+          name: skopeo-${{ matrix.name }}-${{ env.SKOPEO_VERSION }}
+          path: skopeo-${{ matrix.name }}-${{ env.SKOPEO_VERSION }}.*
           if-no-files-found: error
 
   upload:
@@ -127,11 +128,11 @@ jobs:
     runs-on: ubuntu-slim
     permissions:
       contents: read
-      id-token: write
+      id-token: write # OIDC token for AWS login
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: buildah-*
+          pattern: skopeo-*
           merge-multiple: true
 
       - name: Configure AWS Credentials
@@ -139,13 +140,13 @@ jobs:
         with:
           aws-region: ap-southeast-2
           role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload
-          role-session-name: GHA@3PB=buildah
+          role-session-name: GHA@3PB=skopeo
 
       - name: Upload
         run: |
-          for f in buildah-*; do
-            aws s3 cp "$f" "s3://bes-ops-tools/buildah/${{ env.BUILDAH_VERSION }}/$f" --no-progress
+          for f in skopeo-*; do
+            aws s3 cp $f s3://bes-ops-tools/skopeo/${{ env.SKOPEO_VERSION }}/$f --no-progress
           done
 
       - name: Clear cache
-        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths '/buildah/*'
+        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths '/skopeo/*'

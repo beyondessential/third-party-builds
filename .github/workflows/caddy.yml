@@ -19,10 +19,105 @@ concurrency:
 
 env:
   GO_VERSION: 1.26.0
-  CADDY_VERSION: 2.11.4
+
+  # ── What we build ────────────────────────────────────────────────────────
+  # We build stock Caddy plus one unmerged upstream change: WebTransport
+  # termination (caddyserver/caddy#7669), which lets Caddy terminate /
+  # reverse-proxy WebTransport on its existing HTTP/3 socket (needed to serve WT
+  # and HTTP/3+WebPKI on one port). It isn't in any tagged release, and because
+  # it's unmerged its commits live only on the PR author's fork — so we pin the
+  # exact PR-head commit here and inject it with a --replace in the build step,
+  # exactly the way the certmagic fix is handled there.
+  #
+  # CADDY_REF is a *pinned commit SHA*, not a branch, so it is immutable: go.sum
+  # records its hash (the build fails loudly if the content ever differs), and a
+  # force-push / rebase / branch-delete on the source cannot silently change what
+  # we build. Bumping it — to follow newer master or a newer revision of #7669 —
+  # is therefore a deliberate, reviewed act: update CADDY_REF in a PR here, once
+  # you've checked the new commit still does what we want.
+  #
+  # Residual risk is availability only: if CADDY_REPO disappears before Go's
+  # module proxy has cached the commit, a clean build can't fetch it. If that
+  # ever bites, mirror the commit to a repo we control and repoint CADDY_REPO —
+  # integrity is unaffected either way (go.sum).
+  CADDY_REPO: tomholford/caddy
+  CADDY_REF: 349f04696fbb86f7057cf0572492dbc8fd7e022b # caddyserver/caddy#7669 head
+
+  # BES packaging / patch revision — the `-besN` suffix on the .deb version.
+  # Bump this by 1 when the *patch stack or packaging* changes but the *upstream
+  # master base has NOT advanced* (e.g. you re-cherry-pick a newer revision of
+  # #7669 onto the same master commit, or edit the .deb packaging below).
+  # You MAY reset it to 1 whenever the upstream base moves — the upstream part of
+  # the version sorts higher regardless — but otherwise never decrease it, or
+  # `apt upgrade` will stop offering the newer build.
+  BES_REV: 1
 
 jobs:
+  # Derive one apt-monotonic version string shared by every target/job.
+  #
+  #   Scheme:  <base>+git<count>.<sha>-bes<rev>   e.g. 2.11.4+git25.13a4c3f-bes1
+  #
+  #   <base>+git<count>.<sha>
+  #       Describes the *upstream master commit* the fork branch is based on:
+  #       nearest release tag + commits-since + short sha. It is measured against
+  #       the fork's `master` (the merge-base), NOT the branch tip, so the count
+  #       is immune to how many commits our patch stack has — reshaping or
+  #       squashing #7669 can never make the version go backwards. The sha here
+  #       is the upstream base commit; the exact fork commit that was *built* is
+  #       recorded in the build attestation and in `caddy version`.
+  #   -bes<rev>
+  #       Our packaging / patch revision (BES_REV, above).
+  #
+  # `+` sorts *after* the base release, so our snapshot supersedes stock upstream
+  # in apt, and <base> advances on its own as upstream tags new releases on the
+  # master line.
+  #
+  # ── When both patches are gone (see the build job) ──
+  # Once #7669 is released upstream and the certmagic fix has landed, delete this
+  # whole job, add `CADDY_VERSION: <that release>` back to the env block, and set
+  # the .deb Version to `${CADDY_VERSION}-bes<rev>`.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      caddy: ${{ steps.derive.outputs.caddy }}
+      deb: ${{ steps.derive.outputs.deb }}
+      base_tag: ${{ steps.derive.outputs.base_tag }}
+    steps:
+      - id: derive
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Clone the canonical repo (durable: master + all release tags) and
+          # fetch the pinned #7669 commit via its pull-request ref, so we can
+          # position it relative to master for versioning without depending on
+          # the author's fork here. Blobless: commit graph + tags, no file blobs.
+          git clone --filter=blob:none https://github.com/caddyserver/caddy.git src
+          cd src
+          git fetch --filter=blob:none origin pull/7669/head
+
+          # Guard: the pinned commit must still be reachable.
+          git cat-file -e "${CADDY_REF}^{commit}"
+
+          # Version base = the upstream master commit #7669 sits on (merge-base),
+          # so the count is immune to the size/shape of the PR's own commits.
+          base_commit="$(git merge-base "${CADDY_REF}" origin/master)"
+          raw="$(git describe --tags --long "$base_commit")"; raw="${raw#v}"
+          base="${raw%-*-g*}"     # e.g. 2.11.4
+          rest="${raw#"$base"-}"  # e.g. 25-g13a4c3f4
+          count="${rest%-g*}"     # e.g. 25
+          sha="${rest#*-g}"       # e.g. 13a4c3f4
+
+          caddy="${base}+git${count}.${sha}"
+          deb="${caddy}-bes${BES_REV}"
+
+          echo "caddy=${caddy}"    >> "$GITHUB_OUTPUT"
+          echo "deb=${deb}"        >> "$GITHUB_OUTPUT"
+          echo "base_tag=v${base}" >> "$GITHUB_OUTPUT"
+          echo "Building caddy ${deb} (caddy master ${base_commit} + #7669 ${CADDY_REF})"
+
   build:
+    needs: version
     strategy:
       matrix:
         include:
@@ -60,14 +155,29 @@ jobs:
       - run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
       - shell: bash
         run: |
-          # certmagic is pinned to the merge commit of caddyserver/certmagic#380
-          # ("Support listening on file descriptors"), which fixes fd-passing
-          # but landed just after certmagic v0.25.3 was tagged. Caddy 2.11.4
-          # still bundles v0.25.3, so without this replace, fd-based bind
-          # directives can't obtain certificates. Drop the --replace once a
-          # certmagic release including #380 ships and Caddy picks it up.
-          xcaddy build v${{ env.CADDY_VERSION }} \
-            --replace github.com/caddyserver/certmagic=github.com/caddyserver/certmagic@9b6be22a3ea4d6abfe96375b0ce494594cb754b2 \
+          # We build stock Caddy with two unmerged patches injected via --replace
+          # (see the env block at the top of this file for CADDY_REPO/CADDY_REF).
+          # The positional version below is only the *nominal* module requirement
+          # — the first --replace overrides the module source with the pinned
+          # #7669 commit, so the tag value here is not what actually gets built.
+          #
+          # ── To drop the WebTransport patch (#7669) ──
+          # Once #7669 is merged upstream AND a tagged Caddy release includes it:
+          #   * delete the `version` job and the first --replace below;
+          #   * remove CADDY_REPO/CADDY_REF and add `CADDY_VERSION: <that release>`
+          #     to the env block;
+          #   * change this to `xcaddy build v${{ env.CADDY_VERSION }} ...`;
+          #   * set the .deb Version (below) to `${CADDY_VERSION}-bes<rev>`.
+          #
+          # ── To drop the certmagic patch ──
+          # certmagic#380 ("Support listening on file descriptors") fixes
+          # fd-passing; without it, fd-based bind directives can't obtain
+          # certificates. It shipped in certmagic v0.25.4, but the Caddy we build
+          # still requires v0.25.3, so we force v0.25.4 via --replace. Drop this
+          # second --replace once the Caddy we build requires certmagic >= v0.25.4.
+          xcaddy build ${{ needs.version.outputs.base_tag }} \
+            --replace github.com/caddyserver/caddy/v2=github.com/${{ env.CADDY_REPO }}@${{ env.CADDY_REF }} \
+            --replace github.com/caddyserver/certmagic=github.com/caddyserver/certmagic@v0.25.4 \
             --with github.com/caddy-dns/route53@v1.6.2 \
             --with github.com/mholt/caddy-ratelimit@v0.1.0 \
             --with github.com/corazawaf/coraza-caddy/v2@v2.5.0
@@ -83,30 +193,35 @@ jobs:
       - name: Make deb (Linux only)
         if: matrix.goos == 'linux'
         shell: bash
+        env:
+          # Upstream version part (…+git…) for paths/filenames, and the full
+          # Debian version (…-besN) for the package control field.
+          CADDY_VERSION: ${{ needs.version.outputs.caddy }}
+          DEB_VERSION: ${{ needs.version.outputs.deb }}
         run: |
           set -x
 
-          mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/servers
-          mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/var/lib/caddy
-          mkdir -p caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN
+          mkdir -p caddy-${{ matrix.name }}-${CADDY_VERSION}/etc/caddy/servers
+          mkdir -p caddy-${{ matrix.name }}-${CADDY_VERSION}/var/lib/caddy
+          mkdir -p caddy-${{ matrix.name }}-${CADDY_VERSION}/DEBIAN
 
           # Install binary
-          install -Dm755 caddy-${{ matrix.name }} caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/usr/bin/caddy
+          install -Dm755 caddy-${{ matrix.name }} caddy-${{ matrix.name }}-${CADDY_VERSION}/usr/bin/caddy
 
           # Install systemd units
-          install -Dm644 caddy-files/caddy.service caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/lib/systemd/system/caddy.service
-          install -Dm644 caddy-files/caddy.socket caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/lib/systemd/system/caddy.socket
+          install -Dm644 caddy-files/caddy.service caddy-${{ matrix.name }}-${CADDY_VERSION}/lib/systemd/system/caddy.service
+          install -Dm644 caddy-files/caddy.socket caddy-${{ matrix.name }}-${CADDY_VERSION}/lib/systemd/system/caddy.socket
 
           # Install config files
-          install -Dm644 caddy-files/Caddyfile caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/Caddyfile
-          install -Dm644 caddy-files/config/issuer caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/config/issuer
-          install -Dm644 caddy-files/config/waf caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/config/waf
-          install -Dm644 caddy-files/snippets/waf caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/etc/caddy/snippets/waf
+          install -Dm644 caddy-files/Caddyfile caddy-${{ matrix.name }}-${CADDY_VERSION}/etc/caddy/Caddyfile
+          install -Dm644 caddy-files/config/issuer caddy-${{ matrix.name }}-${CADDY_VERSION}/etc/caddy/config/issuer
+          install -Dm644 caddy-files/config/waf caddy-${{ matrix.name }}-${CADDY_VERSION}/etc/caddy/config/waf
+          install -Dm644 caddy-files/snippets/waf caddy-${{ matrix.name }}-${CADDY_VERSION}/etc/caddy/snippets/waf
 
           # Create control file
-          cat > caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/control <<EOF
+          cat > caddy-${{ matrix.name }}-${CADDY_VERSION}/DEBIAN/control <<EOF
           Package: caddy
-          Version: ${{ env.CADDY_VERSION }}-bes1
+          Version: ${DEB_VERSION}
           Architecture: ${{ matrix.debarch }}
           Priority: optional
           Section: net
@@ -117,7 +232,7 @@ jobs:
           EOF
 
           # Create conffiles (mark config files as conffiles so they won't be overwritten)
-          cat > caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/conffiles <<EOF
+          cat > caddy-${{ matrix.name }}-${CADDY_VERSION}/DEBIAN/conffiles <<EOF
           /etc/caddy/Caddyfile
           /etc/caddy/config/issuer
           /etc/caddy/config/waf
@@ -125,7 +240,7 @@ jobs:
           EOF
 
           # Create postinst script to create user/group
-          cat > caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/postinst <<'EOF'
+          cat > caddy-${{ matrix.name }}-${CADDY_VERSION}/DEBIAN/postinst <<'EOF'
           #!/bin/sh
           set -e
 
@@ -149,10 +264,10 @@ jobs:
           #DEBHELPER#
           EOF
 
-          chmod 755 caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/postinst
+          chmod 755 caddy-${{ matrix.name }}-${CADDY_VERSION}/DEBIAN/postinst
 
           # Create postrm script to clean up user/group on purge
-          cat > caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/postrm <<'EOF'
+          cat > caddy-${{ matrix.name }}-${CADDY_VERSION}/DEBIAN/postrm <<'EOF'
           #!/bin/sh
           set -e
 
@@ -170,15 +285,15 @@ jobs:
           #DEBHELPER#
           EOF
 
-          chmod 755 caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/postrm
+          chmod 755 caddy-${{ matrix.name }}-${CADDY_VERSION}/DEBIAN/postrm
 
           # Build deb package
-          dpkg-deb --root-owner-group -b caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}
+          dpkg-deb --root-owner-group -b caddy-${{ matrix.name }}-${CADDY_VERSION}
 
       - uses: actions/attest-build-provenance@v1
         if: matrix.goos == 'linux'
         with:
-          subject-path: caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}.*
+          subject-path: caddy-${{ matrix.name }}-${{ needs.version.outputs.caddy }}.*
       - uses: actions/attest-build-provenance@v1
         if: matrix.goos != 'linux'
         with:
@@ -190,7 +305,7 @@ jobs:
           if-no-files-found: error
 
   upload:
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -209,11 +324,13 @@ jobs:
           role-session-name: GHA@3PB=Caddy
 
       - name: Upload
+        env:
+          CADDY_VERSION: ${{ needs.version.outputs.caddy }}
         run: |
           for f in caddy-*; do
             # Skip directories (the deb build directories)
             [ -d "$f" ] && continue
-            aws s3 cp $f s3://bes-ops-tools/caddy/${{ env.CADDY_VERSION }}/$f --no-progress
+            aws s3 cp $f s3://bes-ops-tools/caddy/${CADDY_VERSION}/$f --no-progress
             aws s3 cp $f s3://bes-ops-tools/caddy/latest/$f --no-progress
           done
 

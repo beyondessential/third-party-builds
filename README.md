@@ -183,3 +183,19 @@ Reason: .deb packaging for a version compatible with Podman 5.
 https://tools.ops.tamanu.io/netavark/{version}/netavark-{target}-{version}.tar.zst
 https://tools.ops.tamanu.io/netavark/{version}/netavark-{target}-{version}.deb
 ```
+
+### Seedling
+
+- Upstream: <https://github.com/beyondessential/seedling> (first-party)
+- Targets: Linux (x64 and ARM64) for all binaries; macOS (Intel and ARM64) and Windows (x64) for `seedling-ctl` and `seedling-web`
+- Package: .deb (Linux) and tar.zst (all platforms)
+- APT: Available in repository
+
+Reason: BES' own container app management system. Built in its own repository (like bestool and algae), which publishes the `.deb` and tarballs to `s3://bes-ops-tools/`; this repo only indexes them into the APT repository. The `seedling` package ships all three binaries; the daemon is Linux-only, while `seedling-ctl` and `seedling-web` are also built for macOS and Windows.
+
+```
+https://tools.ops.tamanu.io/seedling/{version}/seedling-{target}-{version}.deb
+https://tools.ops.tamanu.io/seedling/{version}/seedling-{target}-{version}.tar.zst
+https://tools.ops.tamanu.io/seedling-ctl/{version}/seedling-ctl-{target}-{version}.tar.zst
+https://tools.ops.tamanu.io/seedling-web/{version}/seedling-web-{target}-{version}.tar.zst
+```

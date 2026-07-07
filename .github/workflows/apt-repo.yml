@@ -62,7 +62,9 @@ jobs:
             done
             # Other packages do not have glibc-specific variants; use the standard pattern.
             # kopia is a static (CGO_ENABLED=0) Go binary, so it has no glibc variants either.
-            for dir in caddy kopia bestool algae; do
+            # seedling is a first-party tool built in its own repo (like bestool/algae),
+            # publishing seedling-<target>-<version>.deb under s3://bes-ops-tools/seedling/.
+            for dir in caddy kopia bestool algae seedling; do
               mkdir -p repo/pool/$arch/$dir
               aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-$target-*.deb"
             done
@@ -192,6 +194,10 @@ jobs:
       - name: Install packages from repository
         run: |
           sudo apt-get install -y aardvark-dns buildah caddy crun kopia krun netavark passt podman bestool bestool-{psql,alertd} algae
+          # seedling recommends jool-dkms (a DKMS kernel-module build) and btrfs-progs;
+          # skip recommends here so the smoke test does not depend on the runner kernel
+          # having headers for the DKMS build. Real installs pull the recommends.
+          sudo apt-get install -y --no-install-recommends seedling
 
       - name: Verify installations
         run: |
@@ -212,6 +218,9 @@ jobs:
           bestool-psql -h
           bestool-alertd -h
           algae --version
+          seedling --version
+          seedling-ctl --version
+          seedling-web --version
 
       - name: Check systemd units (caddy)
         run: |
@@ -265,6 +274,8 @@ jobs:
           apt-get update
           apt-get install -y aardvark-dns buildah caddy crun kopia krun netavark passt podman \
             bestool bestool-psql bestool-alertd algae
+          # seedling: skip recommends (jool-dkms/btrfs-progs) in this smoke test.
+          apt-get install -y --no-install-recommends seedling
           /usr/local/libexec/podman/aardvark-dns --version
           buildah --version
           caddy version
@@ -281,4 +292,7 @@ jobs:
           bestool-psql -h
           bestool-alertd -h
           algae --version
+          seedling --version
+          seedling-ctl --version
+          seedling-web --version
           EOF

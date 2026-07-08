@@ -78,7 +78,7 @@ https://tools.ops.tamanu.io/aardvark-dns/{version}/aardvark-dns-{target}-{versio
 - Package: .deb (Linux only), raw executable (all platforms)
 - APT: Available in repository
 
-Reason: includes the [Route53 DNS](https://github.com/caddy-dns/route53) and other plugins.
+Reason: includes the [Route53 DNS](https://github.com/caddy-dns/route53) and other plugins, plus some patches not yet in a Caddy release.
 
 ```
 https://tools.ops.tamanu.io/caddy/{version}/caddy-{target}

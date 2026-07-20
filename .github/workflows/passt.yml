@@ -92,7 +92,7 @@ jobs:
            host's network via TAP devices and is the default rootless backend
            for podman 5.
           EOF
-          dpkg-deb --root-owner-group -b passt-${{ matrix.name }}-${{ steps.ver.outputs.deb }}
+          dpkg-deb --root-owner-group -Z xz -b passt-${{ matrix.name }}-${{ steps.ver.outputs.deb }}
 
       - uses: actions/attest-build-provenance@v1
         with:

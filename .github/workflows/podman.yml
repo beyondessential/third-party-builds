@@ -138,7 +138,7 @@ jobs:
           Homepage: https://github.com/containers/podman
           Description: tool to manage containers and pods
           EOF
-          dpkg-deb --root-owner-group -b podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
+          dpkg-deb --root-owner-group -Z xz -b podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
 
       - uses: actions/attest-build-provenance@v1
         with:

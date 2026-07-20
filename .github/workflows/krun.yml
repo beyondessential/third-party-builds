@@ -128,7 +128,7 @@ jobs:
            podman and other OCI runtimes can be configured to use it via
            '--runtime krun'. Coexists with the standard crun package.
           EOF
-          dpkg-deb --root-owner-group -b krun-${{ matrix.name }}-${{ env.CRUN_VERSION }}
+          dpkg-deb --root-owner-group -Z xz -b krun-${{ matrix.name }}-${{ env.CRUN_VERSION }}
 
       - uses: actions/attest-build-provenance@v1
         with:

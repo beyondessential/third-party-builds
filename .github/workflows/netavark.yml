@@ -85,7 +85,7 @@ jobs:
            Netavark is designed to work with Podman but is also applicable
            for other OCI container management applications.
           EOF
-          dpkg-deb --root-owner-group -b netavark-${{ matrix.name }}-${{ env.NETAVARK_VERSION }}
+          dpkg-deb --root-owner-group -Z xz -b netavark-${{ matrix.name }}-${{ env.NETAVARK_VERSION }}
 
       - uses: actions/attest-build-provenance@v1
         with:

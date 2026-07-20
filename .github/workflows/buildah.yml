@@ -110,7 +110,7 @@ jobs:
           Homepage: https://buildah.io
           Description: A tool which facilitates building OCI container images
           EOF
-          dpkg-deb --root-owner-group -b buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}
+          dpkg-deb --root-owner-group -Z xz -b buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}
 
       - uses: actions/attest-build-provenance@v1
         with:

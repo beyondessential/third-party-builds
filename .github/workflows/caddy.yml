@@ -173,7 +173,7 @@ jobs:
           chmod 755 caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}/DEBIAN/postrm
 
           # Build deb package
-          dpkg-deb --root-owner-group -b caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}
+          dpkg-deb --root-owner-group -Z xz -b caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}
 
       - uses: actions/attest-build-provenance@v1
         if: matrix.goos == 'linux'

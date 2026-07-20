@@ -92,7 +92,7 @@ jobs:
            libkrunfw embeds a Linux kernel image into a shared library so that
            libkrun can load it as the guest kernel for its KVM-based microVMs.
           EOF
-          dpkg-deb --root-owner-group -b libkrunfw-${{ matrix.name }}-${{ env.LIBKRUNFW_VERSION }}
+          dpkg-deb --root-owner-group -Z xz -b libkrunfw-${{ matrix.name }}-${{ env.LIBKRUNFW_VERSION }}
 
       - uses: actions/attest-build-provenance@v1
         with:

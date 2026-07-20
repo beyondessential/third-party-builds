@@ -286,3 +286,71 @@ jobs:
           seedling-ctl --version
           seedling-web --version
           EOF
+
+  test-repo-debian-12:
+    needs: generate-repo
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Wait for CloudFront cache to clear
+        run: sleep 30
+      - name: Install and verify on Debian 12
+        run: |
+          docker run --rm -i -e DEBIAN_FRONTEND=noninteractive debian:12 \
+            bash -euxo pipefail <<'EOF'
+          apt-get update
+          apt-get install -y curl gpg ca-certificates
+          mkdir -p /etc/apt/keyrings
+          curl -fsSL https://tools.ops.tamanu.io/apt/bes-tools.gpg.key \
+            | gpg --dearmor -o /etc/apt/keyrings/bes-tools.gpg
+          echo "deb [signed-by=/etc/apt/keyrings/bes-tools.gpg] https://tools.ops.tamanu.io/apt stable main" \
+            > /etc/apt/sources.list.d/bes-tools.list
+          cat > /etc/apt/preferences.d/bes-tools <<PIN
+          Package: *
+          Pin: origin tools.ops.tamanu.io
+          Pin-Priority: 999
+          PIN
+          apt-get update
+          apt-get install -y aardvark-dns buildah caddy crun kopia krun netavark passt podman \
+            bestool bestool-psql bestool-alertd algae
+          apt-get install -y --no-install-recommends seedling
+          bestool --version; bestool-psql -h; bestool-alertd -h
+          algae --version; seedling --version; caddy version; kopia --version
+          EOF
+
+  test-repo-debian-11:
+    needs: generate-repo
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Wait for CloudFront cache to clear
+        run: sleep 30
+      - name: Install and verify first-party subset on Debian 11
+        run: |
+          docker run --rm -i -e DEBIAN_FRONTEND=noninteractive debian:11 \
+            bash -euxo pipefail <<'EOF'
+          apt-get update
+          apt-get install -y curl gpg ca-certificates
+          mkdir -p /etc/apt/keyrings
+          curl -fsSL https://tools.ops.tamanu.io/apt/bes-tools.gpg.key \
+            | gpg --dearmor -o /etc/apt/keyrings/bes-tools.gpg
+          echo "deb [signed-by=/etc/apt/keyrings/bes-tools.gpg] https://tools.ops.tamanu.io/apt stable main" \
+            > /etc/apt/sources.list.d/bes-tools.list
+          cat > /etc/apt/preferences.d/bes-tools <<PIN
+          Package: *
+          Pin: origin tools.ops.tamanu.io
+          Pin-Priority: 999
+          PIN
+          apt-get update
+          # glibc 2.31 on bullseye: only the first-party subset is expected to work.
+          apt-get install -y bestool bestool-psql bestool-alertd algae
+          apt-get install -y --no-install-recommends seedling
+          bestool --version; bestool-psql -h; bestool-alertd -h
+          algae --version; seedling --version
+          EOF

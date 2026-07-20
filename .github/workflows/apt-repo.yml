@@ -23,6 +23,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  helper-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deb tooling
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev binutils zstd xz-utils
+      - name: repack-to-xz helper
+        run: bash scripts/test/repack-to-xz.test.sh
+      - name: select-new-debs helper
+        run: bash scripts/test/select-new-debs.test.sh
+
   generate-repo:
     runs-on: ubuntu-slim
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}

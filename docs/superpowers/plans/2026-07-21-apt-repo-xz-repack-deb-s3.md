@@ -563,9 +563,11 @@ gh pr create --repo beyondessential/third-party-builds --head apt-repo-xz-deb-s3
 
 The PR's own `helper-tests` job must be green before merge. `generate-repo`/smoke-test jobs only run meaningfully after merge (they publish to the live bucket), so do not expect them to exercise the live repo from the PR.
 
-- [ ] **Step 2: Run the gated full rebuild**
+- [ ] **Step 2: Run the gated full rebuild — as the FIRST action after merge**
 
-After merge, from `main`:
+⚠️ **Merging this PR auto-triggers `generate-repo`** (the `push` trigger's `paths` includes `apt-repo.yml`, and any build workflow finishing within 3h fires the `workflow_run` trigger too). That automatic run has `rebuild` falsy, so it runs *incremental against the old hand-rolled zstd repo*: with `--preserve-versions`, deb-s3 skips the debs whose version+arch already exist, leaving the **old zstd stanzas authoritative** (Debian 11 still broken) while marking those source keys as ingested. This is **not** the cutover — it must be superseded by a rebuild.
+
+The rebuild wipes `apt/` and clears the marker, so it fully recovers from that state regardless. Run it as the first thing after merge (don't wait — if the auto-run is mid-flight, the `concurrency: apt-repo` group serialises them):
 
 ```bash
 gh workflow run "APT Repository" -f rebuild=true --ref main
@@ -585,12 +587,24 @@ Expected: only `*.tar.xz` / `*.tar.gz` members (plus `debian-binary`, `control.t
 
 Then confirm the `test-repo-debian-11` and `test-repo-debian-12` jobs (triggered by the rebuild run) are green — this is the definitive proof the original `bestool` failure is fixed.
 
-- [ ] **Step 4: Confirm steady-state is incremental**
+- [ ] **Step 4: Confirm steady-state is incremental AND that deb-s3 merges (does not truncate) the manifest**
 
 ```bash
 gh workflow run "APT Repository" --ref main   # no rebuild flag
 ```
 Expected in logs: `no new amd64 packages` / `no new arm64 packages` (marker already covers everything); deb-s3 does not re-download the pool.
+
+Critically — this run is the check for the one load-bearing assumption: that `deb-s3 upload` **merges** into the existing per-arch manifest rather than regenerating it from only the staged debs. Since this incremental run stages nothing, the served set must be UNCHANGED and complete afterwards. Verify the full set still resolves (do not rely on the "no new packages" log alone — that only proves the marker diff, not that the manifest survived):
+
+```bash
+# Package count must match the rebuild's, and all five smoke-test jobs (deb 11/12,
+# ubuntu 24.04/26.04) triggered by this run must stay green.
+for arch in amd64 arm64; do
+  echo "$arch:"; deb-s3 list --bucket bes-ops-tools --prefix apt --arch "$arch" \
+    --codename stable --component main --s3-region ap-southeast-2 | wc -l
+done
+```
+Expected: counts equal to the post-rebuild counts. If a single-new-package run ever drops the count to ~1, deb-s3 is regenerating rather than merging — stop and reassess (the design's core assumption would be wrong); recover via another `rebuild=true`.
 
 - [ ] **Step 5: Clean up the backup once satisfied**
 

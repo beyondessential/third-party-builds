@@ -128,7 +128,7 @@ jobs:
           EOF
           chmod 755 $pkg/DEBIAN/postrm
 
-          dpkg-deb --root-owner-group -b $pkg
+          dpkg-deb --root-owner-group -Z xz -b $pkg
 
       - uses: actions/attest-build-provenance@v1
         with:

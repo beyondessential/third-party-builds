@@ -104,7 +104,7 @@ jobs:
            hypervisor as a process isolation mechanism, by setting up a
            microVM around the workload using the libkrunfw kernel image.
           EOF
-          dpkg-deb --root-owner-group -b libkrun-${{ matrix.name }}-${{ env.LIBKRUN_VERSION }}
+          dpkg-deb --root-owner-group -Z xz -b libkrun-${{ matrix.name }}-${{ env.LIBKRUN_VERSION }}
 
       - uses: actions/attest-build-provenance@v1
         with:

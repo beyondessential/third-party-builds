@@ -106,7 +106,7 @@ jobs:
           Homepage: https://github.com/containers/crun
           Description:  lightweight OCI runtime for running containers
           EOF
-          dpkg-deb --root-owner-group -b crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}
+          dpkg-deb --root-owner-group -Z xz -b crun-${{ matrix.name }}-${{ env.CRUN_VERSION }}
 
       - uses: actions/attest-build-provenance@v1
         with:

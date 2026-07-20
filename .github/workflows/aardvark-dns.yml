@@ -77,7 +77,7 @@ jobs:
            records. It is used by Netavark to provide DNS resolution between
            containers on a Podman network.
           EOF
-          dpkg-deb --root-owner-group -b aardvark-dns-${{ matrix.name }}-${{ env.AARDVARK_DNS_VERSION }}
+          dpkg-deb --root-owner-group -Z xz -b aardvark-dns-${{ matrix.name }}-${{ env.AARDVARK_DNS_VERSION }}
 
       - uses: actions/attest-build-provenance@v1
         with:

@@ -2,6 +2,11 @@ name: APT Repository
 
 on:
   workflow_dispatch:
+    inputs:
+      rebuild:
+        description: "Full rebuild: snapshot, wipe, and republish the entire repo from source"
+        type: boolean
+        default: false
   schedule:
     - cron: "0 */3 * * *"
   workflow_run:
@@ -13,6 +18,11 @@ on:
       - main
     paths:
       - .github/workflows/apt-repo.yml
+      - scripts/**
+  pull_request:
+    paths:
+      - .github/workflows/apt-repo.yml
+      - scripts/**
 
 permissions:
   id-token: write
@@ -23,14 +33,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  helper-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deb tooling
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev binutils zstd xz-utils
+      - name: repack-to-xz helper
+        run: bash scripts/test/repack-to-xz.test.sh
+      - name: select-new-debs helper
+        run: bash scripts/test/select-new-debs.test.sh
+
   generate-repo:
+    needs: helper-tests
     runs-on: ubuntu-slim
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y dpkg-dev gzip gnupg
+          sudo apt-get install -y dpkg-dev binutils gnupg ruby ruby-dev build-essential zstd xz-utils
+          sudo gem install deb-s3 -v 26.1.1
+          deb-s3 --version
 
       - name: Import GPG key
         run: |
@@ -44,123 +70,87 @@ jobs:
           role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload
           role-session-name: GHA@3PB=apt-repo
 
-      - name: Download all .deb files from S3
+      - name: Snapshot and wipe (full rebuild only)
+        if: ${{ inputs.rebuild }}
         run: |
           set -x
-          for archs in amd64.x86_64 arm64.aarch64
-          do
-            arch=$(cut -d. -f1 <<< "$archs")
-            target=$(cut -d. -f2 <<< "$archs")
-            # Container runtime tools: pull only the glibc-2.35-compatible (gnu35) builds.
-            # Both gnu (>=2.38) and gnu35 (>=2.35) builds exist in S3, and if both are
-            # indexed they produce duplicate Package+Version+Arch entries that confuse APT.
-            # The gnu35 builds satisfy glibc >=2.35, so they work on Debian Bookworm (2.36)
-            # and Ubuntu 24.04 (2.39) alike — there is no benefit to shipping the gnu builds.
+          runid="${{ github.run_id }}"
+          aws s3 sync s3://bes-ops-tools/apt/ "s3://bes-ops-tools/apt-backup-$runid/" --no-progress
+          aws s3 rm s3://bes-ops-tools/apt/ --recursive --no-progress
+          aws s3 rm s3://bes-ops-tools/apt-state/ingested-keys.txt --no-progress || true
+
+      - name: Publish new packages
+        env:
+          GPG_KEY_ID: ${{ vars.GPG_KEY_ID }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/repack-to-xz.sh scripts/select-new-debs.sh
+
+          # Current ingested-keys marker. Distinguish "not present yet" (genuine
+          # first run / post-rebuild -> start empty) from a transient download
+          # error (must fail loudly, not silently reprocess the entire repo).
+          if aws s3 ls s3://bes-ops-tools/apt-state/ingested-keys.txt >/dev/null 2>&1; then
+            aws s3 cp s3://bes-ops-tools/apt-state/ingested-keys.txt ingested-keys.txt --no-progress
+          else
+            : > ingested-keys.txt
+          fi
+
+          gpg --export --armor "$GPG_KEY_ID" > bes-tools.gpg.key
+          aws s3 cp bes-tools.gpg.key s3://bes-ops-tools/apt/bes-tools.gpg.key --no-progress
+
+          publish_arch() {
+            local arch="$1" target="$2"
+            # Build the candidate source-key list using the same filters as before.
+            : > candidates.txt
             for dir in aardvark-dns buildah crun krun libkrun libkrunfw netavark passt podman; do
-              mkdir -p repo/pool/$arch/$dir
-              aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-${target}-unknown-linux-gnu35-*.deb"
+              aws s3 ls "s3://bes-ops-tools/$dir/" --recursive \
+                | awk '{print $4}' | grep -E "(^|/)$dir/.*-${target}-unknown-linux-gnu35-.*\.deb$" >> candidates.txt || true
             done
-            # Other packages do not have glibc-specific variants; use the standard pattern.
-            # kopia is a static (CGO_ENABLED=0) Go binary, so it has no glibc variants either.
-            # seedling is a first-party tool built in its own repo (like bestool/algae),
-            # publishing seedling-<target>-<version>.deb under s3://bes-ops-tools/seedling/.
             for dir in caddy kopia bestool algae seedling; do
-              mkdir -p repo/pool/$arch/$dir
-              aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-$target-*.deb"
+              aws s3 ls "s3://bes-ops-tools/$dir/" --recursive \
+                | awk '{print $4}' | grep -E "(^|/)$dir/.*-${target}-.*\.deb$" >> candidates.txt || true
             done
-            # bestool-alertd and bestool-psql also publish an unversioned-filename copy
-            # of the current deb under latest/; skip it to avoid duplicate Package+Version+Arch entries.
             for dir in bestool-alertd bestool-psql; do
-              mkdir -p repo/pool/$arch/$dir
-              aws s3 sync s3://bes-ops-tools/$dir/ repo/pool/$arch/$dir/ --no-progress --exclude "*" --include "*-$target-*.deb" --exclude "latest/*"
+              aws s3 ls "s3://bes-ops-tools/$dir/" --recursive \
+                | awk '{print $4}' | grep -E "(^|/)$dir/.*-${target}-.*\.deb$" | grep -v "/latest/" >> candidates.txt || true
             done
-          done
-          find repo/pool -name "*.deb" -type f
 
-      - name: Generate repository metadata
-        run: |
-          set -x
-          cd repo
-          for arch in amd64 arm64
-          do
-            mkdir -p dists/stable/main/binary-$arch
-            dpkg-scanpackages --multiversion pool/$arch /dev/null | tee dists/stable/main/binary-$arch/Packages
-            gzip --keep --best dists/stable/main/binary-$arch/Packages
-            bzip2 --keep --best dists/stable/main/binary-$arch/Packages
-            xz --keep -6e dists/stable/main/binary-$arch/Packages
-          done
+            local newkeys
+            newkeys=$(scripts/select-new-debs.sh ingested-keys.txt < candidates.txt)
+            if [ -z "$newkeys" ]; then
+              echo "no new $arch packages"
+              return 0
+            fi
 
-      - name: Generate Release file
-        run: |
-          cd repo/dists/stable
+            mkdir -p "staged/$arch"
+            local i=0
+            while IFS= read -r key; do
+              [ -n "$key" ] || continue
+              aws s3 cp "s3://bes-ops-tools/$key" "src.deb" --no-progress
+              scripts/repack-to-xz.sh src.deb "staged/$arch/$(printf '%04d' "$i")-$(basename "$key")"
+              rm -f src.deb
+              echo "$key" >> ingested-keys.txt
+              i=$((i + 1))
+            done <<< "$newkeys"
 
-          cat > Release <<EOF
-          Origin: BES Tools
-          Label: BES Tools
-          Suite: stable
-          Codename: stable
-          Architectures: amd64 arm64
-          Components: main
-          Description: Tools and runtimes for BES deployments
-          Date: $(date -Ru)
-          EOF
+            deb-s3 upload \
+              --bucket bes-ops-tools --prefix apt \
+              --s3-region ap-southeast-2 \
+              --codename stable --suite stable --component main --origin "BES Tools" \
+              --arch "$arch" \
+              --preserve-versions \
+              --visibility public \
+              --sign="$GPG_KEY_ID" \
+              --gpg-options="--pinentry-mode loopback --batch --yes --no-tty" \
+              "staged/$arch/"*.deb
 
-          # Generate checksums
-          echo "MD5Sum:" >> Release
-          find main -type f | while read file; do
-            md5sum "$file" | awk '{print " " $1, "'$(stat -c%s "$file")'", "'"$file"'"}' >> Release
-          done
+            # Checkpoint the marker after each arch publishes, so a failure in a
+            # later arch does not force reprocessing an already-published one.
+            aws s3 cp ingested-keys.txt s3://bes-ops-tools/apt-state/ingested-keys.txt --no-progress
+          }
 
-          echo "SHA1:" >> Release
-          find main -type f | while read file; do
-            sha1sum "$file" | awk '{print " " $1, "'$(stat -c%s "$file")'", "'"$file"'"}' >> Release
-          done
-
-          echo "SHA256:" >> Release
-          find main -type f | while read file; do
-            sha256sum "$file" | awk '{print " " $1, "'$(stat -c%s "$file")'", "'"$file"'"}' >> Release
-          done
-
-      - name: Sign Release
-        run: |
-          cd repo/dists/stable
-          cat Release
-          gpg --export --armor ${{ vars.GPG_KEY_ID }} > ../../bes-tools.gpg.key
-          gpg --batch --yes --no-tty --pinentry-mode loopback --default-key ${{ vars.GPG_KEY_ID }} -abs -o Release.gpg Release
-          gpg --batch --yes --no-tty --pinentry-mode loopback --default-key ${{ vars.GPG_KEY_ID }} --clearsign -o InRelease Release
-
-      - name: Upload repository to S3
-        run: |
-          aws s3 sync repo/ s3://bes-ops-tools/apt/ --delete --no-progress
-
-          # Set proper content types
-
-          aws s3 cp s3://bes-ops-tools/apt/ s3://bes-ops-tools/apt/ \
-            --exclude "*" \
-            --include "*.deb" \
-            --recursive \
-            --no-guess-mime-type \
-            --content-type "application/vnd.debian.binary-package" \
-            --metadata-directive REPLACE \
-            --no-progress
-
-          aws s3 cp s3://bes-ops-tools/apt/ s3://bes-ops-tools/apt/ \
-            --exclude "*" \
-            --include "Packages*" \
-            --recursive \
-            --no-guess-mime-type \
-            --content-type "text/plain" \
-            --metadata-directive REPLACE \
-            --no-progress
-
-          aws s3 cp s3://bes-ops-tools/apt/ s3://bes-ops-tools/apt/ \
-            --exclude "*" \
-            --include "Release*" \
-            --recursive \
-            --no-guess-mime-type \
-            --content-type "text/plain" \
-            --metadata-directive REPLACE \
-            --no-progress
+          publish_arch amd64 x86_64
+          publish_arch arm64 aarch64
 
       - name: Clear CloudFront cache
         run: |
@@ -295,4 +285,72 @@ jobs:
           seedling --version
           seedling-ctl --version
           seedling-web --version
+          EOF
+
+  test-repo-debian-12:
+    needs: generate-repo
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Wait for CloudFront cache to clear
+        run: sleep 30
+      - name: Install and verify on Debian 12
+        run: |
+          docker run --rm -i -e DEBIAN_FRONTEND=noninteractive debian:12 \
+            bash -euxo pipefail <<'EOF'
+          apt-get update
+          apt-get install -y curl gpg ca-certificates
+          mkdir -p /etc/apt/keyrings
+          curl -fsSL https://tools.ops.tamanu.io/apt/bes-tools.gpg.key \
+            | gpg --dearmor -o /etc/apt/keyrings/bes-tools.gpg
+          echo "deb [signed-by=/etc/apt/keyrings/bes-tools.gpg] https://tools.ops.tamanu.io/apt stable main" \
+            > /etc/apt/sources.list.d/bes-tools.list
+          cat > /etc/apt/preferences.d/bes-tools <<PIN
+          Package: *
+          Pin: origin tools.ops.tamanu.io
+          Pin-Priority: 999
+          PIN
+          apt-get update
+          apt-get install -y aardvark-dns buildah caddy crun kopia krun netavark passt podman \
+            bestool bestool-psql bestool-alertd algae
+          apt-get install -y --no-install-recommends seedling
+          bestool --version; bestool-psql -h; bestool-alertd -h
+          algae --version; seedling --version; caddy version; kopia --version
+          EOF
+
+  test-repo-debian-11:
+    needs: generate-repo
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Wait for CloudFront cache to clear
+        run: sleep 30
+      - name: Install and verify first-party subset on Debian 11
+        run: |
+          docker run --rm -i -e DEBIAN_FRONTEND=noninteractive debian:11 \
+            bash -euxo pipefail <<'EOF'
+          apt-get update
+          apt-get install -y curl gpg ca-certificates
+          mkdir -p /etc/apt/keyrings
+          curl -fsSL https://tools.ops.tamanu.io/apt/bes-tools.gpg.key \
+            | gpg --dearmor -o /etc/apt/keyrings/bes-tools.gpg
+          echo "deb [signed-by=/etc/apt/keyrings/bes-tools.gpg] https://tools.ops.tamanu.io/apt stable main" \
+            > /etc/apt/sources.list.d/bes-tools.list
+          cat > /etc/apt/preferences.d/bes-tools <<PIN
+          Package: *
+          Pin: origin tools.ops.tamanu.io
+          Pin-Priority: 999
+          PIN
+          apt-get update
+          # glibc 2.31 on bullseye: only the first-party subset is expected to work.
+          apt-get install -y bestool bestool-psql bestool-alertd algae
+          apt-get install -y --no-install-recommends seedling
+          bestool --version; bestool-psql -h; bestool-alertd -h
+          algae --version; seedling --version
           EOF

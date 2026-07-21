@@ -75,7 +75,9 @@ jobs:
         run: |
           set -x
           runid="${{ github.run_id }}"
-          aws s3 sync s3://bes-ops-tools/apt/ "s3://bes-ops-tools/apt-backup-$runid/" --no-progress
+          # --copy-props none: this is an S3->S3 copy, and preserving object
+          # props would call s3:GetObjectTagging, which the upload role lacks.
+          aws s3 sync s3://bes-ops-tools/apt/ "s3://bes-ops-tools/apt-backup-$runid/" --no-progress --copy-props none
           aws s3 rm s3://bes-ops-tools/apt/ --recursive --no-progress
           aws s3 rm s3://bes-ops-tools/apt-state/ingested-keys.txt --no-progress || true
 
@@ -139,7 +141,7 @@ jobs:
               --codename stable --suite stable --component main --origin "BES Tools" \
               --arch "$arch" \
               --preserve-versions \
-              --visibility public \
+              --visibility nil \
               --sign="$GPG_KEY_ID" \
               --gpg-options="--pinentry-mode loopback --batch --yes --no-tty" \
               "staged/$arch/"*.deb

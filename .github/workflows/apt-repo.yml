@@ -44,9 +44,106 @@ jobs:
       - name: select-new-debs helper
         run: bash scripts/test/select-new-debs.test.sh
 
+  # PR-only: exercise the REAL publish path (repack + deb-s3 upload + the
+  # snapshot S3->S3 copy form) against a mock S3 (LocalStack), so gem-version,
+  # aws/deb-s3 param, and flow/manifest breakage is caught on the PR instead of
+  # during a live cutover. The production upload role is not assumable from a
+  # pull_request OIDC context, so this uses LocalStack rather than real S3;
+  # real-IAM actions are therefore not covered here (the known ones are fixed,
+  # and the post-merge Debian smoke tests exercise real installs).
+  test-publish-integration:
+    needs: helper-tests
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    services:
+      s3:
+        image: localstack/localstack:3
+        ports:
+          - 4566:4566
+    env:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: ap-southeast-2
+      ENDPOINT: http://localhost:4566
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev binutils gnupg ruby ruby-dev build-essential zstd xz-utils
+          sudo gem install deb-s3 -v 26.1.0
+          deb-s3 --version
+          aws --version
+      - name: Wait for LocalStack S3
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf "$ENDPOINT/_localstack/health" >/dev/null 2>&1; then echo ready; exit 0; fi
+            sleep 2
+          done
+          echo "LocalStack did not become ready"; exit 1
+      - name: Publish path against mock S3
+        run: |
+          set -euo pipefail
+          chmod +x scripts/repack-to-xz.sh
+          AWS="aws --endpoint-url=$ENDPOINT"
+          $AWS s3 mb s3://bes-ops-tools
+
+          # Ephemeral signing key (no dependency on the production GPG secret).
+          export GNUPGHOME="$(mktemp -d)"
+          gpg --batch --pinentry-mode loopback --passphrase '' \
+            --quick-generate-key "apt-ci <ci@bes.local>" default default never
+          KEYID=$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr:/{print $10; exit}')
+
+          mkfixture() {  # <version> <out.deb> : build a synthetic zstd .deb
+            local d; d="$(mktemp -d)/p"; mkdir -p "$d/DEBIAN" "$d/usr/bin"
+            printf 'Package: apt-ci-fixture\nVersion: %s\nArchitecture: amd64\nMaintainer: ci <ci@bes.local>\nDescription: ci fixture\n' "$1" > "$d/DEBIAN/control"
+            printf '#!/bin/sh\ntrue\n' > "$d/usr/bin/apt-ci-fixture"; chmod 755 "$d/usr/bin/apt-ci-fixture"
+            dpkg-deb --root-owner-group -Z zstd -b "$d" "$2"
+          }
+          publish() {  # <deb> : the production deb-s3 invocation, against the mock endpoint
+            deb-s3 upload \
+              --bucket bes-ops-tools --prefix apt \
+              --endpoint "$ENDPOINT" --force-path-style \
+              --s3-region ap-southeast-2 \
+              --codename stable --suite stable --component main --origin "BES Tools" \
+              --arch amd64 --preserve-versions --visibility nil \
+              --sign="$KEYID" --gpg-options="--pinentry-mode loopback --batch --yes --no-tty" \
+              "$1"
+          }
+
+          mkdir -p staged
+          # 1) repack zstd -> xz, publish v1
+          mkfixture 1.0.0 src1.deb
+          scripts/repack-to-xz.sh src1.deb staged/f1.deb
+          ar t staged/f1.deb | grep -q 'data.tar.xz' || { echo "repack did not produce xz"; exit 1; }
+          publish staged/f1.deb
+
+          # 2) publish v2, then assert the manifest MERGED (both versions kept) —
+          #    validates deb-s3 does not truncate the manifest on incremental runs.
+          mkfixture 2.0.0 src2.deb
+          scripts/repack-to-xz.sh src2.deb staged/f2.deb
+          publish staged/f2.deb
+
+          $AWS s3 cp s3://bes-ops-tools/apt/dists/stable/main/binary-amd64/Packages packages.txt
+          grep -q 'Version: 1.0.0' packages.txt || { echo "v1 dropped: deb-s3 truncated the manifest"; exit 1; }
+          grep -q 'Version: 2.0.0' packages.txt || { echo "v2 missing from manifest"; exit 1; }
+
+          # 3) signed InRelease produced
+          $AWS s3 cp s3://bes-ops-tools/apt/dists/stable/InRelease inrelease.txt
+          grep -q 'BEGIN PGP SIGNED MESSAGE' inrelease.txt
+
+          # 4) the snapshot S3->S3 copy form (validates the --copy-props none flag)
+          $AWS s3 sync s3://bes-ops-tools/apt/ s3://bes-ops-tools/apt-backup-ci/ --no-progress --copy-props none
+
+          # 5) a served pool deb is xz
+          poolkey=$($AWS s3 ls s3://bes-ops-tools/apt/pool/ --recursive | awk '{print $4}' | grep '\.deb$' | head -1)
+          $AWS s3 cp "s3://bes-ops-tools/$poolkey" served.deb
+          ar t served.deb | grep -q 'data.tar.xz' || { echo "served deb is not xz"; exit 1; }
+          echo "mock publish OK: repack=xz, manifest merged (v1+v2), signed, snapshot-copy valid"
+
   generate-repo:
     needs: helper-tests
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
     steps:
       - uses: actions/checkout@v4

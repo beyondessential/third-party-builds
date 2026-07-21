@@ -132,14 +132,18 @@ jobs:
           $AWS s3 cp s3://bes-ops-tools/apt/dists/stable/InRelease inrelease.txt
           grep -q 'BEGIN PGP SIGNED MESSAGE' inrelease.txt
 
-          # 4) the snapshot S3->S3 copy form (validates the --copy-props none flag)
-          $AWS s3 sync s3://bes-ops-tools/apt/ s3://bes-ops-tools/apt-backup-ci/ --no-progress --copy-props none
-
-          # 5) a served pool deb is xz
+          # 4) a served pool deb is xz
           poolkey=$($AWS s3 ls s3://bes-ops-tools/apt/pool/ --recursive | awk '{print $4}' | grep '\.deb$' | head -1)
           $AWS s3 cp "s3://bes-ops-tools/$poolkey" served.deb
           ar t served.deb | grep -q 'data.tar.xz' || { echo "served deb is not xz"; exit 1; }
-          echo "mock publish OK: repack=xz, manifest merged (v1+v2), signed, snapshot-copy valid"
+
+          # 5) exercise the exact rebuild-path command FORMS so a bad flag is caught
+          #    here, not during a live cutover (this is what missed the aws s3 rm
+          #    --no-progress bug): the snapshot copy, then the recursive wipe.
+          $AWS s3 sync s3://bes-ops-tools/apt/ s3://bes-ops-tools/apt-backup-ci/ --only-show-errors --copy-props none
+          $AWS s3 rm s3://bes-ops-tools/apt/ --recursive --only-show-errors
+          $AWS s3 rm s3://bes-ops-tools/apt-state/ingested-keys.txt --only-show-errors || true
+          echo "mock publish OK: repack=xz, manifest merged (v1+v2), signed, snapshot+wipe forms valid"
 
   generate-repo:
     needs: helper-tests
@@ -174,9 +178,12 @@ jobs:
           runid="${{ github.run_id }}"
           # --copy-props none: this is an S3->S3 copy, and preserving object
           # props would call s3:GetObjectTagging, which the upload role lacks.
-          aws s3 sync s3://bes-ops-tools/apt/ "s3://bes-ops-tools/apt-backup-$runid/" --no-progress --copy-props none
-          aws s3 rm s3://bes-ops-tools/apt/ --recursive --no-progress
-          aws s3 rm s3://bes-ops-tools/apt-state/ingested-keys.txt --no-progress || true
+          # --only-show-errors: aws s3 rm does NOT accept --no-progress (only
+          # cp/mv/sync do); --only-show-errors is valid on all of them and also
+          # suppresses the per-object copy/delete log spam.
+          aws s3 sync s3://bes-ops-tools/apt/ "s3://bes-ops-tools/apt-backup-$runid/" --only-show-errors --copy-props none
+          aws s3 rm s3://bes-ops-tools/apt/ --recursive --only-show-errors
+          aws s3 rm s3://bes-ops-tools/apt-state/ingested-keys.txt --only-show-errors || true
 
       - name: Publish new packages
         env:

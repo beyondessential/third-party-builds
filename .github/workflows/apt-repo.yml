@@ -419,12 +419,11 @@ jobs:
           Pin-Priority: 999
           PIN
           apt-get update
-          # seedling is excluded: it requires glibc >= 2.39 (Ubuntu 24.04+), so it
-          # cannot install on Debian 12 (glibc 2.36). It is covered by the Ubuntu jobs.
-          apt-get install -y aardvark-dns buildah caddy crun kopia krun netavark passt podman \
-            bestool bestool-psql bestool-alertd algae
-          bestool --version; bestool-psql -h; bestool-alertd -h
-          algae --version; caddy version; kopia --version
+          # Debian only needs to prove bestool installs and runs (the tool the
+          # bullseye boxes use, and the original zstd regression). Everything
+          # else is exercised by the Ubuntu jobs.
+          apt-get install -y bestool
+          bestool --version
           EOF
 
   test-repo-debian-11:
@@ -454,10 +453,9 @@ jobs:
           Pin-Priority: 999
           PIN
           apt-get update
-          # glibc 2.31 on bullseye: only the glibc-2.31-compatible first-party tools
-          # install. seedling needs glibc >= 2.39, so it is excluded (as on Debian 12);
-          # it is covered by the Ubuntu jobs.
-          apt-get install -y bestool bestool-psql bestool-alertd algae
-          bestool --version; bestool-psql -h; bestool-alertd -h
-          algae --version
+          # Debian only needs to prove bestool installs and runs on bullseye
+          # (glibc 2.31) — the tool the bullseye boxes use, and the original zstd
+          # regression. Everything else is exercised by the Ubuntu jobs.
+          apt-get install -y bestool
+          bestool --version
           EOF

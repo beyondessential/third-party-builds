@@ -61,7 +61,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Checkout podman source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: containers/podman
           ref: v${{ env.PODMAN_VERSION }}
@@ -140,10 +140,10 @@ jobs:
           EOF
           dpkg-deb --root-owner-group -Z xz -b podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
 
-      - uses: actions/attest-build-provenance@v1
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}.*
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}
           path: podman-${{ matrix.name }}-${{ env.PODMAN_VERSION }}.*
@@ -162,7 +162,7 @@ jobs:
           merge-multiple: true
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: ap-southeast-2
           role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload

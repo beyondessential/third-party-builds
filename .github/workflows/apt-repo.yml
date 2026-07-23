@@ -245,15 +245,16 @@ jobs:
           publish_arch amd64 x86_64
           publish_arch arm64 aarch64
 
-          # deb-s3 regenerates the Release without Label/Description on each
-          # publish; restore them and re-sign (apt rejects a repo whose Label
-          # changes). Only needed when something was actually published.
-          if [ "$CHANGED" = 1 ]; then
-            GPG_KEY_ID="$GPG_KEY_ID" bash scripts/ensure-release-label.sh apt
-          fi
+          # deb-s3 regenerates the Release without Label/Description on publish;
+          # restore them and re-sign (apt rejects a repo whose Label changes).
+          # Run every time and idempotently, so a repo currently missing Label
+          # self-heals on the next run even when nothing new was published.
+          relabel_out=$(GPG_KEY_ID="$GPG_KEY_ID" bash scripts/ensure-release-label.sh apt)
+          echo "$relabel_out"
+          echo "$relabel_out" | grep -q '^restored' && CHANGED=1
 
-          # Signal the CloudFront step whether anything actually changed, so a
-          # no-op run does not invalidate the cache.
+          # Invalidate CloudFront only when something actually changed (a publish
+          # or a Label restore) — not on a pure no-op run.
           echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
 
       - name: Clear CloudFront cache

@@ -51,7 +51,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-go@v5
         with:
@@ -175,15 +175,15 @@ jobs:
           # Build deb package
           dpkg-deb --root-owner-group -Z xz -b caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}
 
-      - uses: actions/attest-build-provenance@v1
+      - uses: actions/attest-build-provenance@v4
         if: matrix.goos == 'linux'
         with:
           subject-path: caddy-${{ matrix.name }}-${{ env.CADDY_VERSION }}.*
-      - uses: actions/attest-build-provenance@v1
+      - uses: actions/attest-build-provenance@v4
         if: matrix.goos != 'linux'
         with:
           subject-path: caddy-${{ matrix.name }}*
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: caddy-${{ matrix.name }}
           path: caddy-${{ matrix.name }}*
@@ -202,7 +202,7 @@ jobs:
           merge-multiple: true
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: ap-southeast-2
           role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload

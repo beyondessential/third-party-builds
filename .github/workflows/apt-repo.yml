@@ -34,7 +34,7 @@ jobs:
   helper-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install deb tooling
         run: sudo apt-get update && sudo apt-get install -y dpkg-dev binutils zstd xz-utils
       - name: repack-to-xz helper
@@ -64,7 +64,7 @@ jobs:
       AWS_DEFAULT_REGION: ap-southeast-2
       ENDPOINT: http://localhost:4566
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -148,7 +148,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
@@ -163,7 +163,7 @@ jobs:
           gpg --list-secret-keys
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: ap-southeast-2
           role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload

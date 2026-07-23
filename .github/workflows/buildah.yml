@@ -61,7 +61,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Checkout buildah source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: containers/buildah
           ref: v${{ env.BUILDAH_VERSION }}
@@ -112,10 +112,10 @@ jobs:
           EOF
           dpkg-deb --root-owner-group -Z xz -b buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}
 
-      - uses: actions/attest-build-provenance@v1
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}.*
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}
           path: buildah-${{ matrix.name }}-${{ env.BUILDAH_VERSION }}.*
@@ -134,7 +134,7 @@ jobs:
           merge-multiple: true
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: ap-southeast-2
           role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload

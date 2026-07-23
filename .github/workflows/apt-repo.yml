@@ -1,12 +1,10 @@
 name: APT Repository
 
 on:
+  # Full rebuilds are NOT done here — they run locally via
+  # scripts/rebuild-apt-repo.sh (build into a staging prefix, verify, promote).
+  # This workflow only ever does incremental adds of new packages.
   workflow_dispatch:
-    inputs:
-      rebuild:
-        description: "Full rebuild: snapshot, wipe, and republish the entire repo from source"
-        type: boolean
-        default: false
   schedule:
     - cron: "0 */3 * * *"
   workflow_run:
@@ -170,20 +168,6 @@ jobs:
           aws-region: ap-southeast-2
           role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload
           role-session-name: GHA@3PB=apt-repo
-
-      - name: Snapshot and wipe (full rebuild only)
-        if: ${{ inputs.rebuild }}
-        run: |
-          set -x
-          runid="${{ github.run_id }}"
-          # --copy-props none: this is an S3->S3 copy, and preserving object
-          # props would call s3:GetObjectTagging, which the upload role lacks.
-          # --only-show-errors: aws s3 rm does NOT accept --no-progress (only
-          # cp/mv/sync do); --only-show-errors is valid on all of them and also
-          # suppresses the per-object copy/delete log spam.
-          aws s3 sync s3://bes-ops-tools/apt/ "s3://bes-ops-tools/apt-backup-$runid/" --only-show-errors --copy-props none
-          aws s3 rm s3://bes-ops-tools/apt/ --recursive --only-show-errors
-          aws s3 rm s3://bes-ops-tools/apt-state/ingested-keys.txt --only-show-errors || true
 
       - name: Publish new packages
         env:

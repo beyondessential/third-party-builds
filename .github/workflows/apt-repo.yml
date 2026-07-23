@@ -170,6 +170,7 @@ jobs:
           role-session-name: GHA@3PB=apt-repo
 
       - name: Publish new packages
+        id: publish
         env:
           GPG_KEY_ID: ${{ vars.GPG_KEY_ID }}
         run: |
@@ -237,12 +238,26 @@ jobs:
             # Checkpoint the marker after each arch publishes, so a failure in a
             # later arch does not force reprocessing an already-published one.
             aws s3 cp ingested-keys.txt s3://bes-ops-tools/apt-state/ingested-keys.txt --no-progress
+            CHANGED=1
           }
 
+          CHANGED=0
           publish_arch amd64 x86_64
           publish_arch arm64 aarch64
 
+          # deb-s3 regenerates the Release without Label/Description on each
+          # publish; restore them and re-sign (apt rejects a repo whose Label
+          # changes). Only needed when something was actually published.
+          if [ "$CHANGED" = 1 ]; then
+            GPG_KEY_ID="$GPG_KEY_ID" bash scripts/ensure-release-label.sh apt
+          fi
+
+          # Signal the CloudFront step whether anything actually changed, so a
+          # no-op run does not invalidate the cache.
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
+
       - name: Clear CloudFront cache
+        if: steps.publish.outputs.changed == '1'
         run: |
           aws cloudfront create-invalidation \
             --distribution-id=EDAG0UBS1MN74 \

@@ -125,6 +125,10 @@ build() {
   gpg --export --armor "$GPG_KEY_ID" > "$tmp/bes-tools.gpg.key"
   $AWS s3 cp "$tmp/bes-tools.gpg.key" "s3://$BUCKET/$STAGING_PREFIX/bes-tools.gpg.key" || die "gpg key upload failed"
 
+  # deb-s3 drops Label/Description; restore them on the staging Release + re-sign
+  # (apt rejects a repo whose Label changes).
+  GPG_KEY_ID="$GPG_KEY_ID" BUCKET="$BUCKET" bash "$HERE/ensure-release-label.sh" "$STAGING_PREFIX" || die "ensure-release-label failed"
+
   log "=== BUILD COMPLETE -> s3://$BUCKET/$STAGING_PREFIX/ ($(wc -l < "$MARKER") packages) ==="
   log "next: '$0 verify' then '$0 promote'"
 }

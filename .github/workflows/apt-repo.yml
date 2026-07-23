@@ -419,11 +419,12 @@ jobs:
           Pin-Priority: 999
           PIN
           apt-get update
+          # seedling is excluded: it requires glibc >= 2.39 (Ubuntu 24.04+), so it
+          # cannot install on Debian 12 (glibc 2.36). It is covered by the Ubuntu jobs.
           apt-get install -y aardvark-dns buildah caddy crun kopia krun netavark passt podman \
             bestool bestool-psql bestool-alertd algae
-          apt-get install -y --no-install-recommends seedling
           bestool --version; bestool-psql -h; bestool-alertd -h
-          algae --version; seedling --version; caddy version; kopia --version
+          algae --version; caddy version; kopia --version
           EOF
 
   test-repo-debian-11:
@@ -453,9 +454,10 @@ jobs:
           Pin-Priority: 999
           PIN
           apt-get update
-          # glibc 2.31 on bullseye: only the first-party subset is expected to work.
+          # glibc 2.31 on bullseye: only the glibc-2.31-compatible first-party tools
+          # install. seedling needs glibc >= 2.39, so it is excluded (as on Debian 12);
+          # it is covered by the Ubuntu jobs.
           apt-get install -y bestool bestool-psql bestool-alertd algae
-          apt-get install -y --no-install-recommends seedling
           bestool --version; bestool-psql -h; bestool-alertd -h
-          algae --version; seedling --version
+          algae --version
           EOF

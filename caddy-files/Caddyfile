@@ -19,6 +19,9 @@
 
   log {
     output stdout
+    format json {
+      time_format rfc3339_nano
+    }
   }
 
   import /etc/caddy/config/*

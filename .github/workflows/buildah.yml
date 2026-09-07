@@ -69,6 +69,11 @@ jobs:
       - name: Install buildah dependencies
         run: |
           sudo apt-get update
+          # No libsubid-dev: the explicit BUILDTAGS passed to make below replaces
+          # the Makefile's computed tags wholesale (a command-line make variable
+          # overrides its "+=" assignment), so hack/libsubid_tag.sh never takes
+          # effect and nothing links libsubid. Ubuntu 22.04 doesn't package
+          # libsubid-dev at all, so asking for it just breaks the glibc 2.35 legs.
           sudo apt-get install -y \
             btrfs-progs \
             build-essential \
@@ -80,7 +85,6 @@ jobs:
             libdevmapper-dev \
             libseccomp-dev \
             libselinux1-dev \
-            libsubid-dev \
             libsystemd-dev \
             pkg-config
 

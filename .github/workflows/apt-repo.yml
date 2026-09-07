@@ -441,6 +441,18 @@ jobs:
         run: |
           docker run --rm -i -e DEBIAN_FRONTEND=noninteractive debian:11 \
             bash -euxo pipefail <<'EOF'
+          # Bullseye reached end-of-LTS on 2026-08-31. bullseye-security is now
+          # frozen (its final Release file expires 2026-09-07) and its pool is
+          # being pruned out from under a still-live index, so individual .debs
+          # 404 — which one fails varies by mirror backend and arch. EOL suites
+          # live on at archive.debian.org, so point there and drop the security
+          # and updates suites. The base suite has gnupg2 2.2.27-2+deb11u2, one
+          # point release behind security, which is fine for dearmoring a key.
+          # check-valid-until is scoped to this source so the repo added below
+          # is still validated normally.
+          cat > /etc/apt/sources.list <<SOURCES
+          deb [check-valid-until=no] http://archive.debian.org/debian bullseye main
+          SOURCES
           apt-get update
           apt-get install -y curl gpg ca-certificates
           mkdir -p /etc/apt/keyrings

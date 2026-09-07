@@ -17,7 +17,7 @@ permissions:
   attestations: write
 
 env:
-  GO_VERSION: 1.26.3
+  GO_VERSION: 1.27.1
   # Held on the 1.43 line deliberately: netavark 2.x is "required for podman
   # 6.0 and buildah 1.44 and only supported to be used with them together", so
   # buildah 1.44+ moves as part of the podman 6 stack (PR #3), not on its own.

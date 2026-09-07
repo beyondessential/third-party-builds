@@ -193,10 +193,18 @@ jobs:
             local arch="$1" target="$2"
             # Build the candidate source-key list using the same filters as before.
             : > candidates.txt
-            for dir in aardvark-dns buildah crun krun libkrun libkrunfw netavark passt podman; do
+            for dir in aardvark-dns buildah crun krun libkrun libkrunfw netavark passt podman skopeo; do
               aws s3 ls "s3://bes-ops-tools/$dir/" --recursive \
                 | awk '{print $4}' | grep -E "(^|/)$dir/.*-${target}-unknown-linux-gnu35-.*\.deb$" >> candidates.txt || true
             done
+            # containers-common is Architecture: all (config files + man pages only),
+            # so its filename carries no target and one deb serves every arch.
+            # NOTE: ingested-keys.txt records bare S3 keys shared across arches, so
+            # whichever publish_arch runs first claims this key and the second is
+            # filtered out — it would land in one arch index only. Settle this before
+            # podman 6 merges (arch-qualify the marker entry, or publish it as `all`).
+            aws s3 ls "s3://bes-ops-tools/containers-common/" --recursive \
+              | awk '{print $4}' | grep -E "(^|/)containers-common/.*\.deb$" >> candidates.txt || true
             for dir in caddy kopia bestool algae seedling; do
               aws s3 ls "s3://bes-ops-tools/$dir/" --recursive \
                 | awk '{print $4}' | grep -E "(^|/)$dir/.*-${target}-.*\.deb$" >> candidates.txt || true
@@ -289,7 +297,7 @@ jobs:
 
       - name: Install packages from repository
         run: |
-          sudo apt-get install -y aardvark-dns buildah caddy crun kopia krun netavark passt podman bestool bestool-{psql,alertd} algae
+          sudo apt-get install -y aardvark-dns buildah caddy containers-common crun kopia krun netavark passt podman skopeo bestool bestool-{psql,alertd} algae
           # seedling recommends jool-dkms (a DKMS kernel-module build) and btrfs-progs;
           # skip recommends here so the smoke test does not depend on the runner kernel
           # having headers for the DKMS build. Real installs pull the recommends.
@@ -309,6 +317,7 @@ jobs:
           pasta --version
           /usr/bin/podman --version
           /usr/local/bin/podman --version
+          skopeo --version
           [ "$(readlink /usr/local/bin/podman)" = /usr/bin/podman ]
           bestool --version
           bestool-psql -h
@@ -368,7 +377,7 @@ jobs:
           Pin-Priority: 999
           PIN
           apt-get update
-          apt-get install -y aardvark-dns buildah caddy crun kopia krun netavark passt podman \
+          apt-get install -y aardvark-dns buildah caddy containers-common crun kopia krun netavark passt podman skopeo \
             bestool bestool-psql bestool-alertd algae
           # seedling: skip recommends (jool-dkms/btrfs-progs) in this smoke test.
           apt-get install -y --no-install-recommends seedling
@@ -383,6 +392,7 @@ jobs:
           pasta --version
           /usr/bin/podman --version
           /usr/local/bin/podman --version
+          skopeo --version
           [ "$(readlink /usr/local/bin/podman)" = /usr/bin/podman ]
           bestool --version
           bestool-psql -h

@@ -1,0 +1,145 @@
+name: containers-common
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/containers-common.yml
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  attestations: write
+
+# The config files (containers.conf in particular) live in the container-libs
+# monorepo under common/, tagged as common/vX.Y.Z. Podman 6 rewrote its config
+# parser and requires the common v0.68.0 files; Ubuntu ships 0.57.x, which is
+# too old. This package is arch-independent (config + man pages only) and takes
+# over from Ubuntu's golang-github-containers-common.
+env:
+  COMMON_VERSION: 0.68.0
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout container-libs source
+        uses: actions/checkout@v4
+        with:
+          repository: containers/container-libs
+          ref: common/v${{ env.COMMON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y go-md2man make
+
+      - name: Build and install config files + man pages
+        run: |
+          dest="$(pwd)/containers-common-${{ env.COMMON_VERSION }}"
+          mkdir -p "$dest"
+          # Build the man pages, then install containers.conf and the man5 pages.
+          make -C common docs
+          make -C common PREFIX=/usr DESTDIR="$dest" install
+
+          # seccomp.json ships alongside containers.conf under /usr/share/containers.
+          install -m 0644 common/pkg/seccomp/seccomp.json "$dest/usr/share/containers/seccomp.json"
+
+          # policy.json and registries.conf are assembled by the distro rather
+          # than by upstream's `make install`; provide the standard defaults so
+          # this package fully replaces golang-github-containers-common.
+          install -d "$dest/etc/containers"
+          cat > "$dest/etc/containers/policy.json" <<'JSON'
+          {
+              "default": [
+                  {
+                      "type": "insecureAcceptAnything"
+                  }
+              ],
+              "transports": {
+                  "docker-daemon": {
+                      "": [
+                          {
+                              "type": "insecureAcceptAnything"
+                          }
+                      ]
+                  }
+              }
+          }
+          JSON
+          cat > "$dest/etc/containers/registries.conf" <<'CONF'
+          unqualified-search-registries = ["docker.io"]
+
+          short-name-mode = "permissive"
+          CONF
+
+      - name: Make deb
+        run: |
+          dest="containers-common-${{ env.COMMON_VERSION }}"
+          mkdir -p "$dest/DEBIAN"
+          cat <<EOF > "$dest/DEBIAN/control"
+          Package: containers-common
+          Version: ${{ env.COMMON_VERSION }}-bes1
+          Architecture: all
+          Priority: optional
+          Section: universe/admin
+          Maintainer: BES <support@bes.au>
+          Bugs: https://github.com/containers/container-libs/issues
+          Provides: golang-github-containers-common (= ${{ env.COMMON_VERSION }})
+          Conflicts: golang-github-containers-common
+          Replaces: golang-github-containers-common
+          Breaks: podman (<< 6.0.0), buildah (<< 1.44.0)
+          Homepage: https://github.com/containers/container-libs
+          Description: Configuration files and manpages shared by container tools
+           Common configuration files (containers.conf, policy.json,
+           registries.conf, seccomp.json) and manual pages used by Podman,
+           Buildah and Skopeo. Built from the container-libs common release.
+          EOF
+          # conffiles so local edits under /etc are preserved across upgrades.
+          cat <<EOF > "$dest/DEBIAN/conffiles"
+          /etc/containers/policy.json
+          /etc/containers/registries.conf
+          EOF
+          dpkg-deb --root-owner-group -b "$dest"
+
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: containers-common-${{ env.COMMON_VERSION }}.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: containers-common-${{ env.COMMON_VERSION }}
+          path: containers-common-${{ env.COMMON_VERSION }}.deb
+          if-no-files-found: error
+
+  upload:
+    needs: build
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+      id-token: write # OIDC token for AWS login
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: containers-common-*
+          merge-multiple: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ap-southeast-2
+          role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload
+          role-session-name: GHA@3PB=containers-common
+
+      - name: Upload
+        run: |
+          for f in containers-common-*; do
+            aws s3 cp $f s3://bes-ops-tools/containers-common/${{ env.COMMON_VERSION }}/$f --no-progress
+          done
+
+      - name: Clear cache
+        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths '/containers-common/*'

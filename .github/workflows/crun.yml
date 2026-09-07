@@ -72,11 +72,11 @@ jobs:
             git \
             go-md2man \
             libcap-dev \
+            libjson-c-dev \
             libprotobuf-c-dev \
             libseccomp-dev \
             libsystemd-dev \
             libtool \
-            libyajl-dev \
             make \
             pkgconf \
             python3 \
@@ -100,7 +100,7 @@ jobs:
           Section: universe/admin
           Maintainer: BES <support@bes.au>
           Bugs: https://github.com/containers/crun/issues
-          Depends: libc6 (>= ${{ matrix.glibc }}), libcap2 (>= 1:2.10), libseccomp2 (>= 2.3.0), libsystemd0 (>= 246), libyajl2 (>= 2.0.4)
+          Depends: libc6 (>= ${{ matrix.glibc }}), libcap2 (>= 1:2.10), libjson-c5, libseccomp2 (>= 2.3.0), libsystemd0 (>= 246)
           Suggests: libwasmedge0
           Homepage: https://github.com/containers/crun
           Description:  lightweight OCI runtime for running containers

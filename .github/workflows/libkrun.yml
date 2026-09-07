@@ -70,6 +70,11 @@ jobs:
           # clang-sys (a libkrun dep) needs llvm-config and libclang.so to
           # generate bindings; just installing clang isn't enough.
           sudo apt-get install -y build-essential clang libclang-dev llvm pkg-config
+          # Don't let clang-sys pick its own libclang: on the runners it resolves
+          # a stale /usr/lib/llvm-14 whose libclang isn't installed and then
+          # fails to link -lclang-14.0.0. Point it at the libdir of the LLVM we
+          # just installed, whatever version the runner image defaults to.
+          echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> "$GITHUB_ENV"
 
       # libkrun needs libkrunfw available at build time. Pull the previously
       # published libkrunfw deb from our own apt repo (CDN URL) and install it.

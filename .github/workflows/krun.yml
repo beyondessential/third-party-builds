@@ -25,11 +25,11 @@ concurrency:
 env:
   # krun is crun built --with-libkrun and renamed. Use the same crun source
   # version as our regular crun.yml so behaviour stays in sync.
-  CRUN_VERSION: 1.27.1
+  CRUN_VERSION: 1.29.1
   # Must match libkrun (and transitively libkrunfw) versions we've published
   # to the apt repo.
-  LIBKRUN_VERSION: 1.18.1
-  LIBKRUNFW_VERSION: 5.4.0
+  LIBKRUN_VERSION: 1.19.4
+  LIBKRUNFW_VERSION: 5.5.0
 
 jobs:
   build:

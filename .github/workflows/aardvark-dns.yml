@@ -17,6 +17,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # Held at 1.17.x: 2.x is a breaking release "required for podman 6.0 and
+  # buildah 1.44 and only supported to be used with them together", so it moves
+  # with the podman 6 stack (PR #3), not ahead of it.
   AARDVARK_DNS_VERSION: 1.17.1
 
 jobs:

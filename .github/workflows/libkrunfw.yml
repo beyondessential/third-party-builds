@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  LIBKRUNFW_VERSION: 5.4.0
+  LIBKRUNFW_VERSION: 5.5.0
 
 jobs:
   build:

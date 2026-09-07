@@ -22,7 +22,7 @@ env:
   # up with Ubuntu's own passt package, which uses the same scheme (e.g.
   # 0.0~git20260120.386b5f5-1 on 26.04). The -bes1 revision suffix ensures
   # our build of a given upstream snapshot sorts above Ubuntu's -N.
-  PASST_VERSION: 2026_05_07.1afd4ed
+  PASST_VERSION: 2026_07_28.f8df3f1
 
 jobs:
   build:

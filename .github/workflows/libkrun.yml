@@ -23,9 +23,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  LIBKRUN_VERSION: 1.18.1
+  LIBKRUN_VERSION: 1.19.4
   # Must match a libkrunfw we've already published to the apt repo / CDN.
-  LIBKRUNFW_VERSION: 5.4.0
+  LIBKRUNFW_VERSION: 5.5.0
 
 jobs:
   build:

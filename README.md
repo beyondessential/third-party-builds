@@ -139,7 +139,7 @@ https://tools.ops.tamanu.io/kopia/{version}/kopia-{target}-{version}.deb
 - Package: .deb
 - APT: Available in repository
 
-Reason: Ubuntu only packages upki from 26.10. The package carries Ubuntu's configuration, units, system user and AppArmor profile from [its packaging](https://git.launchpad.net/ubuntu/+source/upki) (`upki-files/`), so it matches the archive package.
+Reason: Ubuntu only packages upki from 26.10. The package carries Ubuntu's configuration, units, system user and AppArmor profile from [its packaging](https://git.launchpad.net/ubuntu/+source/upki) (`upki-files/`), so it matches the archive package, and Ubuntu's patch that stops `upki fetch` running as root.
 
 ```
 https://tools.ops.tamanu.io/upki/{version}/upki-{target}-{version}.deb

@@ -44,6 +44,9 @@ jobs:
           repository: rustls/upki
           ref: v${{ env.UPKI_VERSION }}
           path: upki-src
+      - name: Apply patches
+        run: git apply ../upki-files/refuse-fetch-as-root.patch
+        working-directory: upki-src
       - run: rustup toolchain install stable --profile minimal
       - uses: Swatinem/rust-cache@v2
         with:

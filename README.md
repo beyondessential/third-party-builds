@@ -52,7 +52,7 @@ Pin-Priority: 999
 EOF
 
 sudo apt-get update
-sudo apt-get install aardvark-dns buildah caddy crun kopia netavark passt podman
+sudo apt-get install aardvark-dns buildah caddy crun kopia netavark passt podman upki
 ```
 
 ## First party builds
@@ -130,6 +130,19 @@ Reason: we build the lean version (no UI) and include a kopia system user/group/
 
 ```
 https://tools.ops.tamanu.io/kopia/{version}/kopia-{target}-{version}.deb
+```
+
+### [upki](./.github/workflows/upki.yml)
+
+- Upstream: <https://github.com/rustls/upki>
+- Targets: Linux (x64 and ARM64)
+- Package: .deb
+- APT: Available in repository
+
+Reason: Ubuntu only packages upki from 26.10. The package carries Ubuntu's configuration, units, system user and AppArmor profile from [its packaging](https://git.launchpad.net/ubuntu/+source/upki) (`upki-files/`), so it matches the archive package.
+
+```
+https://tools.ops.tamanu.io/upki/{version}/upki-{target}-{version}.deb
 ```
 
 ### [Podman](./.github/workflows/podman.yml)

@@ -1,0 +1,96 @@
+Refuse to run `upki fetch` as root.
+
+Fetching as root would leave root-owned files in the revocation cache that the
+unprivileged fetch service can then no longer update.
+
+Ported to v1.0.1 from Ubuntu's refuse-fetch-as-root.patch by Julian Andres
+Klode <julian.klode@canonical.com>, https://git.launchpad.net/ubuntu/+source/upki
+
+diff --git i/Cargo.lock w/Cargo.lock
+index 69b62d2..31f931a 100644
+--- i/Cargo.lock
++++ w/Cargo.lock
+@@ -2829,6 +2829,7 @@ dependencies = [
+  "insta",
+  "insta-cmd",
+  "jiff",
++ "libc",
+  "regex",
+  "rustls-pki-types",
+  "tempfile",
+diff --git i/Cargo.toml w/Cargo.toml
+index 727182d..06f8b03 100644
+--- i/Cargo.toml
++++ w/Cargo.toml
+@@ -22,6 +22,7 @@ hex = { version = "0.4", features = ["serde"] }
+ http = "1"
+ insta = { version = "1.44.3", features = ["filters"] }
+ insta-cmd = "0.7"
++libc = "0.2"
+ jiff = { version = "0.2.37", default-features = false, features = ["alloc"] }
+ openssl-sys = "0.9"
+ reqwest = { version = "0.13", default-features = false, features = ["charset", "h2", "http2", "json"] }
+diff --git i/upki-cli/Cargo.toml w/upki-cli/Cargo.toml
+index 71044f1..7e0495e 100644
+--- i/upki-cli/Cargo.toml
++++ w/upki-cli/Cargo.toml
+@@ -23,6 +23,9 @@ toml.workspace = true
+ tracing.workspace = true
+ tracing-subscriber.workspace = true
+ 
++[target.'cfg(unix)'.dependencies]
++libc.workspace = true
++
+ [dev-dependencies]
+ jiff.workspace = true
+ insta.workspace = true
+diff --git i/upki-cli/src/bin/upki.rs w/upki-cli/src/bin/upki.rs
+index c62e32b..3baad2d 100644
+--- i/upki-cli/src/bin/upki.rs
++++ w/upki-cli/src/bin/upki.rs
+@@ -48,6 +48,7 @@ async fn main() -> Result<ExitCode, Report> {
+     Ok(match args.command {
+         #[cfg(feature = "__fetch")]
+         Command::Fetch { dry_run } => {
++            refuse_root()?;
+             fetch(dry_run, &config).await?;
+             ExitCode::SUCCESS
+         }
+@@ -79,6 +80,27 @@ async fn main() -> Result<ExitCode, Report> {
+     })
+ }
+ 
++/// Refuse to run as root.
++///
++/// Fetching as root would leave root-owned files in the revocation cache
++/// that the unprivileged fetch service can then no longer update, so tell
++/// the user to start the dedicated service instead.
++#[cfg(all(feature = "__fetch", unix))]
++fn refuse_root() -> Result<(), Report> {
++    // SAFETY: geteuid is always safe to call.
++    if unsafe { libc::geteuid() } != 0 {
++        return Ok(());
++    }
++    Err(Report::msg(
++        "refusing to run as root; start `upki-fetch.service` instead",
++    ))
++}
++
++#[cfg(all(feature = "__fetch", not(unix)))]
++fn refuse_root() -> Result<(), Report> {
++    Ok(())
++}
++
+ #[derive(Debug, Parser)]
+ #[command(name = "upki", author, version, about)]
+ struct Args {
+@@ -103,6 +125,9 @@ enum Command {
+     /// If the `revocation.cache_dir` path does not exist, this tool creates it and parent directories.
+     ///
+     /// This also deletes filters that become unreferenced.
++    ///
++    /// This command refuses to run as root.  Use the packaged `upki-fetch.service` instead,
++    /// which runs as the dedicated unprivileged `upki` user.
+     #[cfg(feature = "__fetch")]
+     Fetch {
+         /// Download the new manifest, and then describe what actions are needed to

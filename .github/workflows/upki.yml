@@ -1,0 +1,132 @@
+name: upki
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/upki.yml
+      - upki-files/**
+
+permissions:
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  UPKI_VERSION: 1.0.1
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            name: x86_64-unknown-linux-gnu
+            debarch: amd64
+          - os: ubuntu-24.04-arm
+            name: aarch64-unknown-linux-gnu
+            debarch: arm64
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Checkout upki source
+        uses: actions/checkout@v7
+        with:
+          repository: rustls/upki
+          ref: v${{ env.UPKI_VERSION }}
+          path: upki-src
+      - name: Apply patches
+        run: git apply ../upki-files/refuse-fetch-as-root.patch
+        working-directory: upki-src
+      - run: rustup toolchain install stable --profile minimal
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: upki-src
+
+      - run: cargo build --release --locked -p upki-cli
+        working-directory: upki-src
+      - run: sudo apt-get update && sudo apt-get install -y help2man
+
+      - name: Make deb
+        env:
+          PKG: upki-${{ matrix.name }}-${{ env.UPKI_VERSION }}
+        run: |
+          set -x
+
+          # Layout and maintainer scripts follow Ubuntu's upki package, so the
+          # user, paths and units match the archive package on 26.10+.
+          install -Dm755 upki-src/target/release/upki "$PKG/usr/bin/upki"
+          install -Dm644 upki-files/config.toml "$PKG/etc/upki/config.toml"
+          install -Dm644 upki-files/usr.bin.upki "$PKG/etc/apparmor.d/usr.bin.upki"
+          install -Dm644 upki-files/upki-fetch.service "$PKG/usr/lib/systemd/system/upki-fetch.service"
+          install -Dm644 upki-files/upki-fetch.timer "$PKG/usr/lib/systemd/system/upki-fetch.timer"
+          install -Dm644 upki-files/sysusers.conf "$PKG/usr/lib/sysusers.d/upki.conf"
+          install -Dm644 upki-files/tmpfiles.conf "$PKG/usr/lib/tmpfiles.d/upki.conf"
+          mkdir -p "$PKG/usr/share/man/man1"
+          help2man --no-info upki-src/target/release/upki | gzip -9n > "$PKG/usr/share/man/man1/upki.1.gz"
+
+          mkdir -p "$PKG/DEBIAN"
+          install -m755 upki-files/postinst upki-files/prerm upki-files/postrm "$PKG/DEBIAN/"
+          cat > "$PKG/DEBIAN/conffiles" <<EOF
+          /etc/upki/config.toml
+          /etc/apparmor.d/usr.bin.upki
+          EOF
+          cat > "$PKG/DEBIAN/control" <<EOF
+          Package: upki
+          Version: ${{ env.UPKI_VERSION }}-bes1
+          Architecture: ${{ matrix.debarch }}
+          Priority: optional
+          Section: utils
+          Maintainer: BES <support@bes.au>
+          Depends: libc6 (>= 2.39), libgcc-s1 (>= 4.2), ca-certificates, systemd (>= 250), init-system-helpers
+          Homepage: https://github.com/rustls/upki
+          Description: Platform-independent browser-grade certificate infrastructure
+           upki keeps a local copy of certificate revocation data, refreshed in the
+           background, and checks certificates against it.
+          EOF
+
+          dpkg-deb --root-owner-group -Z xz -b "$PKG"
+
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: upki-${{ matrix.name }}-${{ env.UPKI_VERSION }}.deb
+      - uses: actions/upload-artifact@v7
+        with:
+          name: upki-${{ matrix.name }}-${{ env.UPKI_VERSION }}
+          path: upki-${{ matrix.name }}-${{ env.UPKI_VERSION }}.deb
+          if-no-files-found: error
+
+  upload:
+    needs: build
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+      id-token: write # OIDC token for AWS login
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: upki-*
+          merge-multiple: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: ap-southeast-2
+          role-to-assume: arn:aws:iam::143295493206:role/gha-tamanu-tools-upload
+          role-session-name: GHA@3PB=upki
+
+      - name: Upload
+        run: |
+          for f in upki-*; do
+            aws s3 cp "$f" "s3://bes-ops-tools/upki/${{ env.UPKI_VERSION }}/$f" --no-progress
+          done
+
+      - name: Clear cache
+        run: aws cloudfront create-invalidation --distribution-id=EDAG0UBS1MN74 --paths '/upki/*'

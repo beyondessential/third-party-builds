@@ -1,0 +1,27 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]; then
+    systemd-sysusers ${DPKG_ROOT:+--root="$DPKG_ROOT"} upki.conf
+    systemd-tmpfiles ${DPKG_ROOT:+--root="$DPKG_ROOT"} --create upki.conf || true
+
+    if [ -z "${DPKG_ROOT:-}" ] && command -v aa-enabled >/dev/null 2>&1 && aa-enabled --quiet 2>/dev/null; then
+        apparmor_parser -r -T -W /etc/apparmor.d/usr.bin.upki || true
+    fi
+fi
+
+if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ]; then
+    deb-systemd-helper unmask upki-fetch.timer >/dev/null || true
+    # was-enabled is true on a fresh install, so the timer is enabled then;
+    # an admin's later disable survives upgrades.
+    if deb-systemd-helper --quiet was-enabled upki-fetch.timer; then
+        deb-systemd-helper enable upki-fetch.timer >/dev/null || true
+    else
+        deb-systemd-helper update-state upki-fetch.timer >/dev/null || true
+    fi
+
+    if [ -z "${DPKG_ROOT:-}" ] && [ -d /run/systemd/system ]; then
+        systemctl --system daemon-reload >/dev/null || true
+        deb-systemd-invoke restart upki-fetch.timer >/dev/null || true
+    fi
+fi

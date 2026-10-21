@@ -8,7 +8,7 @@ on:
   schedule:
     - cron: "0 */3 * * *"
   workflow_run:
-    workflows: ["aardvark-dns", "buildah", "caddy", "crun", "kopia", "krun", "libkrun", "libkrunfw", "netavark", "passt", "podman"]
+    workflows: ["aardvark-dns", "buildah", "caddy", "crun", "kopia", "krun", "libkrun", "libkrunfw", "netavark", "passt", "podman", "upki"]
     types: [completed]
     branches: [main]
   push:
@@ -197,7 +197,7 @@ jobs:
               aws s3 ls "s3://bes-ops-tools/$dir/" --recursive \
                 | awk '{print $4}' | grep -E "(^|/)$dir/.*-${target}-unknown-linux-gnu35-.*\.deb$" >> candidates.txt || true
             done
-            for dir in caddy kopia bestool algae seedling; do
+            for dir in caddy kopia upki bestool algae seedling; do
               aws s3 ls "s3://bes-ops-tools/$dir/" --recursive \
                 | awk '{print $4}' | grep -E "(^|/)$dir/.*-${target}-.*\.deb$" >> candidates.txt || true
             done
@@ -289,7 +289,7 @@ jobs:
 
       - name: Install packages from repository
         run: |
-          sudo apt-get install -y aardvark-dns buildah caddy crun kopia krun netavark passt podman bestool bestool-{psql,alertd} algae
+          sudo apt-get install -y aardvark-dns buildah caddy crun kopia krun netavark passt podman upki bestool bestool-{psql,alertd} algae
           # seedling recommends jool-dkms (a DKMS kernel-module build) and btrfs-progs;
           # skip recommends here so the smoke test does not depend on the runner kernel
           # having headers for the DKMS build. Real installs pull the recommends.
@@ -310,6 +310,7 @@ jobs:
           /usr/bin/podman --version
           /usr/local/bin/podman --version
           [ "$(readlink /usr/local/bin/podman)" = /usr/bin/podman ]
+          upki --version
           bestool --version
           bestool-psql -h
           bestool-alertd -h
@@ -323,6 +324,12 @@ jobs:
           systemctl cat caddy.service
           systemctl cat caddy.socket
 
+      - name: Check systemd units (upki)
+        run: |
+          systemctl cat upki-fetch.service
+          systemctl is-enabled upki-fetch.timer
+          systemctl is-active upki-fetch.timer
+
       - name: Verify user/group created
         run: |
           id caddy
@@ -331,6 +338,8 @@ jobs:
           groups kopia
           getent passwd kopia | grep -q /var/lib/kopia
           [ "$(stat -c '%U:%G' /var/lib/kopia)" = kopia:kopia ]
+          id upki
+          [ "$(stat -c '%U:%G %a' /var/cache/upki/revocation)" = "upki:upki 755" ]
 
   test-repo-26-04:
     needs: generate-repo
@@ -368,7 +377,7 @@ jobs:
           Pin-Priority: 999
           PIN
           apt-get update
-          apt-get install -y aardvark-dns buildah caddy crun kopia krun netavark passt podman \
+          apt-get install -y aardvark-dns buildah caddy crun kopia krun netavark passt podman upki \
             bestool bestool-psql bestool-alertd algae
           # seedling: skip recommends (jool-dkms/btrfs-progs) in this smoke test.
           apt-get install -y --no-install-recommends seedling
@@ -384,6 +393,7 @@ jobs:
           /usr/bin/podman --version
           /usr/local/bin/podman --version
           [ "$(readlink /usr/local/bin/podman)" = /usr/bin/podman ]
+          upki --version
           bestool --version
           bestool-psql -h
           bestool-alertd -h

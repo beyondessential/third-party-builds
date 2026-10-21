@@ -45,7 +45,7 @@ list_candidates() { # $1 = target triple component (x86_64 | aarch64)
     aws s3 ls "s3://$BUCKET/$dir/" --recursive | awk '{print $4}' \
       | grep -E "(^|/)$dir/.*-${target}-unknown-linux-gnu35-.*\.deb$" || true
   done
-  for dir in caddy kopia bestool algae seedling; do
+  for dir in caddy kopia upki bestool algae seedling; do
     aws s3 ls "s3://$BUCKET/$dir/" --recursive | awk '{print $4}' \
       | grep -E "(^|/)$dir/.*-${target}-.*\.deb$" || true
   done
